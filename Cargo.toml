@@ -1,0 +1,23 @@
+[workspace]
+resolver = "2"
+members = ["crates/curve-math", "sim", "contracts/mock-intents", "contracts/mock-swapper", "contracts/coin", "contracts/factory"]
+
+[workspace.package]
+edition = "2021"
+license = "MIT"
+
+[workspace.dependencies]
+uint = { version = "0.10", default-features = false }
+near-sdk = "5.30"
+near-contract-standards = "5.30"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+proptest = "1"
+
+[profile.release]
+codegen-units = 1
+opt-level = "z"
+lto = true
+debug = false
+panic = "abort"
+overflow-checks = true

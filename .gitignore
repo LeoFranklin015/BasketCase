@@ -1,0 +1,11 @@
+target/
+node_modules/
+.next/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+bot/data/
+.keys/
+.orca/

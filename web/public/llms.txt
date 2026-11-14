@@ -4,8 +4,8 @@
 
 Status: runs on NEAR testnet only. Testnet uses stand-in contracts for NEAR Intents (`intents.backedlab.testnet`) and 1Click (`swapper.backedlab.testnet`), and stand-in tokens (`nep141:*.mock`). Nothing is deployed on mainnet. The mainnet swap path (1Click, NEP-413 signed intents) is written and unit-tested but has not moved real funds.
 
-Hosted (testnet): https://fortune-literacy-counter-exceed.trycloudflare.com
-Hosted (same code built for mainnet, not deployed there yet): https://therapeutic-amend-antibodies-midwest.trycloudflare.com
+Hosted (testnet): https://basketcase-testnet.vercel.app
+Hosted (same code built for mainnet, not deployed there yet): https://basketcase-near.vercel.app
 Fallback (testnet, self-signed certificate): https://141.148.209.77:3000
 Try it: open /c/degen-0.pad.backedlab.testnet → Connect → Guest wallet (gas + 100 test USDC arrive by themselves) → Buy.
 

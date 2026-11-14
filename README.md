@@ -99,7 +99,7 @@ Two earlier testnet coins graduated and were listed the same way: $AI ([pool #29
 | <img src="docs/media/shot-markets.png" alt="Markets board"> | <img src="docs/media/shot-xcard.png" alt="X player card" width="70%"> |
 
 **Try it** (no wallet needed on testnet: a guest wallet with test tokens is made for you):
-- Testnet app: https://fortune-literacy-counter-exceed.trycloudflare.com
+- Testnet app: https://basketcase-testnet.vercel.app
 - Mainnet app: https://basketcase-near.vercel.app
 
 ## Live on NEAR mainnet

@@ -117,7 +117,9 @@ export function Landing() {
   const [pick, setPick] = useState<string | null>(null);
   const coin = coins.find((c) => c.id === pick) ?? coins[0] ?? null;
   const state: LoadState = live.data ? "ok" : live.error ? "error" : "loading";
-  const histories = useHistories(coins);
+  // How it works plays an example coin; its 24-hour history is made once in the browser (it uses the clock).
+  const [demoTradesNow, setDemoTrades] = useState<Trade[]>();
+  useEffect(() => setDemoTrades(demoTrades(Date.now())), []);
 
   return (
     <div className="relative isolate flex min-h-dvh flex-col">
@@ -150,7 +152,7 @@ export function Landing() {
 
       <main id="main" className="flex-1">
         <Hero live={live.data} error={live.error} state={state} coins={coins} coin={coin} onPick={setPick} />
-        <HowItWorks coin={coin} trades={coin ? histories[coin.id] : undefined} graduated={graduatedExample(coins)} />
+        <HowItWorks coin={DEMO_COIN} trades={demoTradesNow} graduated={DEMO_GRADUATED} />
         <WhyDifferent coin={coin} />
         <OnX coin={coins.find((c) => c.ticker === "GPU") ?? coin} />
       </main>
@@ -372,6 +374,66 @@ function CoinCard({ coin }: { coin: LiveCoin }) {
 
 const STEP_MS = 4000;
 
+/* "How it works" tells one fixed story with an example coin, so it reads the same on every network and never waits
+   on live data. The numbers are illustrative and the section says so. */
+const demoRow = (symbol: string, share: number, anchored = false): BasketRow => ({
+  token_id: `example:${symbol}`,
+  q: "0",
+  held: "0",
+  anchored,
+  weight_bps: Math.round(share * 10_000),
+  joined_epoch: 0,
+  symbol,
+  known: true,
+  usd: null,
+  share,
+});
+const DEMO_COIN: LiveCoin = {
+  id: "example-degen",
+  ticker: "DEGEN",
+  name: "Degen",
+  icon: null,
+  mode: "curve",
+  feeBps: 100,
+  priceUsd: 1.4,
+  floorUsd: 1.3,
+  circulating: 50_000,
+  mcapUsd: 70_000,
+  backedUsd: 65_000,
+  hypeUsd: 5_000,
+  share: 1.3 / 1.4,
+  vaultUsd: 65_000,
+  rows: [demoRow("BTC", 0.25, true), demoRow("ETH", 0.2), demoRow("SOL", 0.2), demoRow("NVDA", 0.15), demoRow("BLACKDRAGON", 0.1), demoRow("DOGE", 0.1)],
+  backedBy: "BTC + ETH + 4 more",
+  buE6: 1_000_000,
+  createdMs: 0,
+  creator: "",
+  progress: 0.4,
+};
+const DEMO_GRADUATED: LiveCoin = {
+  ...DEMO_COIN,
+  id: "example-cook",
+  ticker: "COOK",
+  name: "NEAR memes, now an index",
+  mode: "index",
+  vaultUsd: 20_400,
+  rows: [demoRow("JAMBO", 0.34, true), demoRow("BLACKDRAGON", 0.33), demoRow("PEPE", 0.33)],
+  backedBy: "JAMBO + BLACKDRAGON + PEPE",
+  progress: null,
+};
+/** The example coin's last 24 hours: the price wanders up, the floor steps up as fees and burns land. */
+function demoTrades(now: number): Trade[] {
+  const out: Trade[] = [];
+  let floor = 1.18;
+  for (let i = 0; i < 60; i++) {
+    const t = now - (60 - i) * 24 * 60_000;
+    if (i % 9 === 8) floor += 0.02;
+    const price = floor + 0.05 + 0.04 * Math.sin(i / 3.2) + (i / 60) * 0.06;
+    out.push({ ts: t, seq: i, kind: i % 4 === 3 ? "sell" : "buy", path: "curve", account: "example", tokens: 1_000, bu: price * 1_000, fee: null, price, floor });
+  }
+  return out.reverse();
+}
+
 function HowItWorks({ coin, trades, graduated }: { coin: LiveCoin | null; trades: Trade[] | undefined; graduated: LiveCoin | null }) {
   const [step, setStep] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -398,7 +460,7 @@ function HowItWorks({ coin, trades, graduated }: { coin: LiveCoin | null; trades
         <h2 id="how-h" className="meme text-[clamp(2rem,1.4rem+2vw,3rem)]">
           How it works
         </h2>
-        <p className="mt-3 max-w-xl text-[17px] text-muted">Follow one $20 buy of ${t}.</p>
+        <p className="mt-3 max-w-xl text-[17px] text-muted">Follow one $20 buy of an example coin, ${t}. The numbers are illustrative.</p>
 
         <div onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} onFocus={() => setPaused(true)} onBlur={() => setPaused(false)}>
           {/* Four steps in one line: a tab each, the active one fills as it plays. */}
@@ -445,8 +507,10 @@ function HowItWorks({ coin, trades, graduated }: { coin: LiveCoin | null; trades
 /** Step 4: a coin that graduated, from live data: an index you can redeem, with its Rhea pool. */
 function IndexVisual({ coin }: { coin: LiveCoin | null }) {
   if (!coin) return <Skeleton className="h-56 w-full max-w-sm" />;
-  const pool = RHEA_POOLS[coin.id];
-  const rhea = rheaPoolUrl(coin.id);
+  // The example coin points at a real graduated meme coin's Rhea pool on testnet ($COOK951, pool #2982).
+  const example = coin.id.startsWith("example-");
+  const pool = example ? 2982 : RHEA_POOLS[coin.id];
+  const rhea = example ? "https://testnet.rhea.finance/pool/2982" : rheaPoolUrl(coin.id);
   return (
     <div className="w-full max-w-[360px] rounded-[24px] bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_16px_40px_-16px_rgba(0,0,0,0.16)]">
       <div className="flex items-center gap-3">
@@ -470,12 +534,12 @@ function IndexVisual({ coin }: { coin: LiveCoin | null }) {
         {rhea && (
           <a href={rhea} target="_blank" rel="noreferrer" className="inline-flex h-7 items-center gap-1.5 rounded-full bg-pill px-2.5 text-xs font-semibold hover:bg-[var(--pill-hover)]">
             <TokenIcon symbol="RHEA" size={14} />
-            On Rhea · pool #{pool}
+            On Rhea · pool #{pool}{example ? " (testnet)" : ""}
           </a>
         )}
       </span>
-      <Link href={`/c/${coin.id}`} className="btn btn-quiet mt-4 w-full">
-        Redeem for the basket
+      <Link href={example ? "/app" : `/c/${coin.id}`} className="btn btn-quiet mt-4 w-full">
+        {example ? "Explore the coins" : "Redeem for the basket"}
       </Link>
     </div>
   );

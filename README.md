@@ -58,6 +58,25 @@
 The floor is the least a sell pays before the fee. Its dollar value moves with the basket's assets, and it is not a guarantee.
 </details>
 
+## NEAR memes, meme.cooking and Rhea (run on testnet)
+
+A coin made of NEAR's own memes, run through its whole life: launch, fair launch, trading, a holder vote that swaps an asset, graduation into an index, and the automatic Rhea listing. **We ran this on NEAR testnet because we don't have funds on mainnet for it at this moment**; it uses the same contracts and the same keeper as mainnet, with test tokens standing in for JAMBO, BLACKDRAGON, SHITZU and PEPE.
+
+**$COOK951** ([`cook951-0.pad.backedlab.testnet`](https://testnet.nearblocks.io/address/cook951-0.pad.backedlab.testnet)) started with **JAMBO** (a meme.cooking token, anchored), **BLACKDRAGON** and **SHITZU**. Holders voted SHITZU out for **PEPE**, and the coin graduated and was listed on Rhea as **[pool #2982](https://testnet.rhea.finance/pool/2982)** with no one touching it.
+
+| Step | What happened | Transaction |
+|---|---|---|
+| Launch | Basket: JAMBO (meme.cooking) 34%, BLACKDRAGON 33%, SHITZU 33% | [SUrLbEPp…](https://testnet.nearblocks.io/txns/SUrLbEPpRfhNdSUj9yspzZBrtD7uGZyGRXnav6F3BJS) |
+| Fair launch | Two buyers' deposits settle at one average price (1 : 3 tokens, like their deposits) | [5jjUWSgn…](https://testnet.nearblocks.io/txns/5jjUWSgnyNXhRXF8Zwda8wsJCsHeoQw8nPANbgjS2noK) |
+| Trade | A buy and a sell on the curve | [P5ySw6LB…](https://testnet.nearblocks.io/txns/P5ySw6LBcMDDByMvkXRVEUKwJtQFS8uURGfpBDyQam3), [HS919pnA…](https://testnet.nearblocks.io/txns/HS919pnADrJvLf4mEbSFjHhQZcLo6KoDy4eLmdiAf7xy) |
+| Vote | A holder burns 77.5 BU to vote SHITZU out for PEPE; another burns 7.6 BU to defend it | [CUThHwNy…](https://testnet.nearblocks.io/txns/CUThHwNyW4d9T7ik1TYpUjQiJAxwzUvJdBNhGJS17JsB), [GHXAzqLS…](https://testnet.nearblocks.io/txns/GHXAzqLSrEHgSrUwJEErcm65Mi8E9Pwn1rWbLcwiEKxY) |
+| Round closes | The keeper closes the round; the challenge wins and a swap auction opens | [3ghfviqv…](https://testnet.nearblocks.io/txns/3ghfviqvyS1KG76LzZAGcfzEjMZFNfDKBqy5n4YA9XE5) |
+| Swap | The auction fills: PEPE in, SHITZU out to the graveyard | [46REtEPk…](https://testnet.nearblocks.io/txns/46REtEPkRpMPfhs9d1rGtWHymx9wbTQMFZbgCJh8n3Kw) |
+| Graduation | The curve reaches 20,000 BU: minting stops, the built-in pool opens, the coin becomes an index | [DtXZx5tf…](https://testnet.nearblocks.io/txns/DtXZx5tfKLuHrdCykRLn6VmE8g3TGvpqwoLGXCUWxCwp) |
+| Rhea listing (automatic) | The keeper registers the tokens, creates the pool and adds liquidity | [ABLHinA5…](https://testnet.nearblocks.io/txns/ABLHinA576F1Xy7zqqWB29PPEYyAEG3t2VLMbxpDt5YR), [84VjR5kV…](https://testnet.nearblocks.io/txns/84VjR5kVmc5JsoZvTnB4GHSpMjYRbmjR8XLXw71ZH3u8), [DuEHssCm…](https://testnet.nearblocks.io/txns/DuEHssCm7iqREyHPwhgYdJUMFESpzKgrXcGtgbVb51Xn) |
+
+Two earlier testnet coins graduated and were listed the same way: $AI ([pool #2977](https://testnet.rhea.finance/pool/2977)) and $DEMO1283 ([pool #2975](https://testnet.rhea.finance/pool/2975)). The Markets page also lists meme.cooking's graduated memes live from its public API, and a coin's basket can start from any of them. Rerun the whole story yourself: `PRESET=memes pnpm --filter scripts demo <your-account.testnet>`.
+
 ## Why it's different
 
 | | Typical memecoin launchpad | **Basketcase** |
@@ -123,6 +142,10 @@ pnpm verify                             # every offline check: Rust, simulator, 
 ## Built with
 
 NEAR smart contracts in Rust (`near-sdk`) · NEAR Intents (multi-chain vault, signed intents) · 1Click (cross-chain swaps) · Rhea (DEX listing) · Next.js · TypeScript · MetaMask (ERC-191 signing) · Phantom (Ed25519 signing) · MongoDB
+
+## Brand
+
+Logo files (PNG, transparent): [mark 1024 px](web/public/brand/basketcase-mark-1024.png) · [mark 512 px](web/public/brand/basketcase-mark-512.png) · [mark 256 px](web/public/brand/basketcase-mark-256.png) · [logo](web/public/brand/basketcase-logo.png) · [logo on dark](web/public/brand/basketcase-logo-dark.png) · dark mark: [1024 px transparent](web/public/brand/basketcase-mark-dark-1024.png), [512 px transparent](web/public/brand/basketcase-mark-dark-512.png), [1024 px on dark](web/public/brand/basketcase-mark-dark-square-1024.png) · [SVG](web/public/brand/basketcase-mark.svg). Also served by the app at `/brand/…`.
 
 ## Go deeper
 

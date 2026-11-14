@@ -100,6 +100,7 @@
   ],
   "rhea_pools": {
     "demo1283-0.pad.backedlab.testnet": 2975,
-    "ai-0.pad.backedlab.testnet": 2977
+    "ai-0.pad.backedlab.testnet": 2977,
+    "cook951-0.pad.backedlab.testnet": 2982
   }
 }

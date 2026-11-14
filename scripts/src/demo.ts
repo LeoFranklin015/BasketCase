@@ -1,5 +1,7 @@
 // End-to-end on testnet: every product action once, each with an explorer link.
 // Usage: pnpm --filter scripts demo <master.testnet>   (takes about 15 minutes: real windows and epochs)
+// PRESET=memes: a NEAR-memes basket instead: JAMBO from meme.cooking (anchored), BLACKDRAGON and SHITZU; holders
+// vote SHITZU out for PEPE. The default is half BTC (anchored), half USDC, voted out for SOL.
 import { KeyPair } from "near-api-js";
 import { ONE_YOCTO, account, call, callBatch, exists, loadDeployment, near, qFor, saveKey, sleep, tokenBySymbol, txLink, view } from "./lib.js";
 import { buyWithFaucet, buyWithUsdc, faucet, fmt, register, reportPrices } from "./chain.js";
@@ -38,9 +40,15 @@ const bob = await user("bob");
 const keeper = account(`keeper.${master}`);
 const reporter = account(d.reporter);
 
-step(2, "Launch a coin: half BTC (anchored), half USDC (the seat), 10-minute epochs");
-const ticker = `DEMO${Date.now() % 10_000}`;
+const MEMES = process.env.PRESET === "memes";
+const LEGS: [string, number, boolean][] = MEMES
+  ? [["JAMBO", 3_400, true], ["BLACKDRAGON", 3_300, false], ["SHITZU", 3_300, false]]
+  : [["BTC", 5_000, true], ["USDC", 5_000, false]];
+step(2, MEMES ? "Launch a coin of NEAR memes: JAMBO from meme.cooking (anchored), BLACKDRAGON, SHITZU" : "Launch a coin: half BTC (anchored), half USDC (the seat), 10-minute epochs");
+const ticker = MEMES ? `COOK${Date.now() % 1_000}` : `DEMO${Date.now() % 10_000}`;
 const btc = tokenBySymbol("BTC"), usdc = tokenBySymbol("USDC");
+/** The non-anchored asset holders vote out, and what they vote in. */
+const seat = tokenBySymbol(MEMES ? "SHITZU" : "USDC"), replacement = tokenBySymbol(MEMES ? "PEPE" : "SOL");
 const cfg = await view<{ launch_deposit: string }>(d.factory, "get_config");
 const launched = await call<string>(
   m,
@@ -48,11 +56,11 @@ const launched = await call<string>(
   "create_coin",
   {
     config: {
-      ticker, name: `Demo ${ticker}`, icon: null, fee_bps: 100, epoch_profile: "demo", bu_usd_e6: 1_000_000, creator: null,
-      basket: [
-        { token_id: btc.token_id, weight_bps: 5_000, q: qFor(5_000, "1", btc.usd, btc.decimals).toString(), anchored: true },
-        { token_id: usdc.token_id, weight_bps: 5_000, q: qFor(5_000, "1", usdc.usd, usdc.decimals).toString(), anchored: false },
-      ],
+      ticker, name: MEMES ? `Cooked ${ticker}` : `Demo ${ticker}`, icon: null, fee_bps: 100, epoch_profile: "demo", bu_usd_e6: 1_000_000, creator: null,
+      basket: LEGS.map(([sym, w, anchored]) => {
+        const t = tokenBySymbol(sym);
+        return { token_id: t.token_id, weight_bps: w, q: qFor(w, "1", t.usd, t.decimals).toString(), anchored };
+      }),
     },
   },
   { deposit: BigInt(cfg.launch_deposit), tgas: 300, label: `launch $${ticker}` },
@@ -83,12 +91,12 @@ await call(bob, coin, "sell", { amount: sellAmt.toString(), min_bu_out: "0", rec
 let s = await state(coin);
 console.log(`  price ${fmt(s.price, 18 - 6)}e-6 BU, floor ${fmt(s.floor, 18 - 6)}e-6 BU, surplus per token ${s.surplus_per_token}`);
 
-step(6, "Seat challenge: alice burns to swap USDC for SOL, bob defends with less");
+step(6, `Seat challenge: alice burns to swap ${MEMES ? "SHITZU for PEPE" : "USDC for SOL"}, bob defends with less`);
 const epoch = await view<State>(coin, "get_epoch");
-const minBu = BigInt(epoch.min_burn.find((x: State) => x.target === usdc.token_id).min_bu);
+const minBu = BigInt(epoch.min_burn.find((x: State) => x.target === seat.token_id).min_bu);
 const aliceNow = BigInt(await view<string>(coin, "ft_balance_of", { account_id: alice.accountId }));
-await call(alice, coin, "challenge", { target: usdc.token_id, replacement: tokenBySymbol("SOL").token_id, amount: (aliceNow / 2n).toString() }, { deposit: ONE_YOCTO, tgas: 100, label: "alice challenges USDC -> SOL" });
-await call(bob, coin, "defend", { target: usdc.token_id, amount: (BigInt(bBal) / 50n).toString() }, { deposit: ONE_YOCTO, tgas: 100, label: "bob defends USDC" });
+await call(alice, coin, "challenge", { target: seat.token_id, replacement: replacement.token_id, amount: (aliceNow / 2n).toString() }, { deposit: ONE_YOCTO, tgas: 100, label: `alice challenges ${MEMES ? "SHITZU -> PEPE" : "USDC -> SOL"}` });
+await call(bob, coin, "defend", { target: seat.token_id, amount: (BigInt(bBal) / 50n).toString() }, { deposit: ONE_YOCTO, tgas: 100, label: `bob defends ${MEMES ? "SHITZU" : "USDC"}` });
 const e2 = await view<State>(coin, "get_epoch");
 console.log(`  challenge ${fmt(e2.challenges[0].burned_bu)} BU vs defense ${fmt(e2.defenses[0].burned_bu)} BU (minimum ${fmt(minBu)} BU)`);
 s = await state(coin);
@@ -96,11 +104,11 @@ console.log(`  surplus per token after burns: ${s.surplus_per_token}`);
 
 step(7, "Epoch ends: prices posted, close_epoch opens the auction");
 await waitUntil(s.epoch.end_ms, "the epoch to end");
-await reportPrices(reporter, coin, [btc.token_id, usdc.token_id, tokenBySymbol("SOL").token_id]);
+await reportPrices(reporter, coin, [...LEGS.map(([sym]) => tokenBySymbol(sym).token_id), replacement.token_id]);
 const closed = await call<string>(keeper, coin, "close_epoch", {}, { tgas: 100, label: "close_epoch" });
 console.log(`  outcome: ${closed.result}`);
 
-step(8, "The Dutch auction falls to fair; a filler swaps SOL in for the USDC");
+step(8, `The Dutch auction falls to fair; a filler swaps ${MEMES ? "PEPE in for the SHITZU" : "SOL in for the USDC"}`);
 const auction = await view<State>(coin, "get_auction");
 if (auction) {
   await waitUntil(auction.ramp_end_ms, "the auction to reach the fair rate");

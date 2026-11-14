@@ -9,7 +9,11 @@
 
 <p align="center">
   <a href="web/public/media/basketcase-demo-voice.mp4"><img src="docs/media/video-poster.png" alt="Watch the product demo" width="85%"></a>
-  <br><sub>▶ Click to watch the product demo (72 s, narrated) (<code>web/public/media/basketcase-demo-voice.mp4</code>)</sub>
+  <br><sub>▶ Click to watch the product demo (72 s, narrated) · <a href="https://basketcase-near.vercel.app/media/basketcase-demo-voice.mp4">download</a></sub>
+</p>
+
+<p align="center">
+  <b>Try it:</b> <a href="https://basketcase-testnet.vercel.app">testnet app</a> (no wallet needed: a guest wallet with test tokens is made for you) · <a href="https://basketcase-near.vercel.app">mainnet app</a> (MetaMask on Base, Phantom on Solana)
 </p>
 
 ---
@@ -29,7 +33,7 @@
 - **Holders run the basket.** Each round, holders burn tokens to vote an asset out; a Dutch auction swaps in the replacement.
 - **Memecoin today, index tomorrow.** At 20,000 basket units the coin graduates into an index fund and is listed on Rhea (NEAR's DEX) automatically.
 - **Buy from any chain.** Pay with USDC on Base (MetaMask) or Solana (Phantom): one transfer, then you sign messages. No bridge, no new wallet, no NEAR gas, and the coins land under your own wallet's address.
-- **Buy inside your X feed.** A coin's link unfurls into a live card in the post: buy in one tap, sell in one more.
+- **Buy from your X feed.** A coin's link unfurls into a live card in the post with the price, the floor and a Buy button. On testnet you buy and sell right inside the post. On mainnet, Buy opens the coin page in a new tab with your amount filled, because wallet extensions like MetaMask only sign on a page of their own, not inside X.
 
 ## Tokenomics
 
@@ -57,6 +61,18 @@
 
 The floor is the least a sell pays before the fee. Its dollar value moves with the basket's assets, and it is not a guarantee.
 </details>
+
+## 60-day simulation
+
+Five scenarios, 20 seeded runs each, on the contract's own math ([report](docs/simulation.md), [interactive charts](https://basketcase-near.vercel.app/sim)). Medians:
+
+- **Steady growth:** fees alone lift the floor 5% while the price climbs 3.4×.
+- **Pump and dump:** the price falls 69% from its peak; the floor never falls.
+- **Holder votes:** weekly challenge burns leave the floor 40% higher than without them.
+- **Graduation:** every run graduates (median day 7) and the floor jumps to reserve ÷ supply.
+- **NEAR memes basket:** the floor rises 38% in basket units, but with memes swinging 10% a day its dollar value spreads 10× across runs, against 1.9× for majors. The floor protects your share of the basket, not the basket's price.
+
+Rerun it: `cargo run -p sim --release -- --check` → `sim: outputs match a fresh run`.
 
 ## NEAR memes, meme.cooking and Rhea (run on testnet)
 
@@ -86,7 +102,7 @@ Two earlier testnet coins graduated and were listed the same way: $AI ([pool #29
 | Who controls the backing | A team wallet | Nobody: coin accounts have no keys (testnet); holders vote on assets |
 | Assets from other chains | Bridge them yourself | BTC, ETH, SOL, NVDA, NEAR memes in one basket via NEAR Intents |
 | Paying from another chain | Bridge + new wallet + gas | One USDC transfer from MetaMask or Phantom |
-| Where you trade | Leave X for an app | Inside the X post |
+| Where you trade | Leave X for an app | From a card in the X post |
 | End state | Dies or lives on a DEX | Graduates into an index, listed on Rhea automatically |
 | Launch fairness | Snipers and bots win | Fair-launch window: everyone gets the same average price |
 
@@ -97,10 +113,6 @@ Two earlier testnet coins graduated and were listed the same way: $AI ([pool #29
 | <img src="docs/media/shot-landing.png" alt="Landing page"> | <img src="docs/media/shot-coin.png" alt="Coin page with floor and basket"> |
 | **Markets** | **The X card, inside a post** |
 | <img src="docs/media/shot-markets.png" alt="Markets board"> | <img src="docs/media/shot-xcard.png" alt="X player card" width="70%"> |
-
-**Try it** (no wallet needed on testnet: a guest wallet with test tokens is made for you):
-- Testnet app: https://basketcase-testnet.vercel.app
-- Mainnet app: https://basketcase-near.vercel.app
 
 ## Launch your own coin
 
@@ -152,7 +164,25 @@ NEAR smart contracts in Rust (`near-sdk`) · NEAR Intents (multi-chain vault, si
 
 ## Brand
 
-Logo files (PNG, transparent): [mark 1024 px](web/public/brand/basketcase-mark-1024.png) · [mark 512 px](web/public/brand/basketcase-mark-512.png) · [mark 256 px](web/public/brand/basketcase-mark-256.png) · [logo](web/public/brand/basketcase-logo.png) · [logo on dark](web/public/brand/basketcase-logo-dark.png) · dark mark: [1024 px transparent](web/public/brand/basketcase-mark-dark-1024.png), [512 px transparent](web/public/brand/basketcase-mark-dark-512.png), [1024 px on dark](web/public/brand/basketcase-mark-dark-square-1024.png) · X profile picture (1000 px, circle-safe): [yellow](web/public/brand/basketcase-x-avatar-yellow.png), [dark](web/public/brand/basketcase-x-avatar-dark.png), [light](web/public/brand/basketcase-x-avatar-light.png) · covers: [1920×1080](web/public/brand/basketcase-cover-1920x1080.png), [1200×630 link preview](web/public/brand/basketcase-cover-1200x630.png), [X header 1500×500](web/public/brand/basketcase-x-header-1500x500.png) · [SVG](web/public/brand/basketcase-mark.svg). Also served by the app at `/brand/…`.
+<p align="center">
+  <img src="web/public/brand/basketcase-logo.png" alt="Basketcase logo" width="46%">
+  <img src="web/public/brand/basketcase-logo-dark.png" alt="Basketcase logo on dark" width="46%">
+</p>
+<p align="center">
+  <img src="web/public/brand/basketcase-x-avatar-yellow.png" alt="X profile picture" width="140">
+  &nbsp;
+  <img src="web/public/brand/basketcase-x-header-1500x500.png" alt="X header" width="62%">
+</p>
+
+| | Downloads (PNG unless noted) |
+|---|---|
+| Mark | [1024 px](web/public/brand/basketcase-mark-1024.png) · [512 px](web/public/brand/basketcase-mark-512.png) · [256 px](web/public/brand/basketcase-mark-256.png) · [SVG](web/public/brand/basketcase-mark.svg) |
+| Mark for dark backgrounds | [1024 px](web/public/brand/basketcase-mark-dark-1024.png) · [512 px](web/public/brand/basketcase-mark-dark-512.png) · [1024 px on dark](web/public/brand/basketcase-mark-dark-square-1024.png) |
+| Logo (mark + name) | [light](web/public/brand/basketcase-logo.png) · [dark](web/public/brand/basketcase-logo-dark.png) |
+| X | profile picture: [yellow](web/public/brand/basketcase-x-avatar-yellow.png) · [dark](web/public/brand/basketcase-x-avatar-dark.png) · [light](web/public/brand/basketcase-x-avatar-light.png) · [header 1500×500](web/public/brand/basketcase-x-header-1500x500.png) |
+| Covers | [1920×1080](web/public/brand/basketcase-cover-1920x1080.png) · [1200×630 link preview](web/public/brand/basketcase-cover-1200x630.png) |
+
+All also served by the app at `https://basketcase-near.vercel.app/brand/…`.
 
 ## Go deeper
 

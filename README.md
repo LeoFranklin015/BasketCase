@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <b>Try it:</b> <a href="https://basketcase-testnet.vercel.app">testnet app</a> (no wallet needed: a guest wallet with test tokens is made for you) · <a href="https://basketcase-near.vercel.app">mainnet app</a> (MetaMask on Base, Phantom on Solana)
+  <b>Try it:</b> <a href="https://basketcase-near.vercel.app">mainnet app</a> (MetaMask on Base, Phantom on Solana) · <a href="https://basketcase-testnet.vercel.app">testnet app</a> (no wallet needed: a guest wallet with test tokens is made for you)
 </p>
 
 ---
@@ -74,6 +74,43 @@ Five scenarios, 20 seeded runs each, on the contract's own math ([report](docs/s
 
 Rerun it: `cargo run -p sim --release -- --check` → `sim: outputs match a fresh run`.
 
+## Live on NEAR mainnet
+
+$DEGEN (50% BTC, 50% USDC) is deployed at [`degen.basketcase.near`](https://nearblocks.io/address/degen.basketcase.near).
+
+| Step | Transaction |
+|---|---|
+| Master account `basketcase.near` registered | [GFUK9C6z…](https://nearblocks.io/txns/GFUK9C6zUKa2RTx27yuamJa1Gv4oPJvFHFDitm7r42kj) |
+| Coin account `degen.basketcase.near` created | [ZjHSwTBL…](https://nearblocks.io/txns/ZjHSwTBL3QgaMrdZSwE7NVqiA1scTZm8mxnMFJ4jJgk) |
+| Coin contract deployed and initialised (`new`) | [GXP7y1NP…](https://nearblocks.io/txns/GXP7y1NPvSz7caavk7mwCq9FeNoA2J2xT3ENLPug5DBE) |
+| NEAR Intents registered on the coin (`storage_deposit`) | [2GRnJQf7…](https://nearblocks.io/txns/2GRnJQf7oGdSwDKo6x1ZU9scssqBC3BEYcdMYXpochgM) |
+| Gas relayer `router.basketcase.near` created | [2T82V7a3…](https://nearblocks.io/txns/2T82V7a3nbr6M8zBXpHPkzbZjppzSyrBfGAYfhMN6cb2) |
+
+### First real round trip: Base → $DEGEN → Base
+
+A MetaMask wallet paid **$0.50 USDC on Base**, bought $DEGEN, sold it, and cashed out **$0.485 USDC back on Base** (1.5¢ in fees: 1% to buy, 1% to sell, and swap spreads). Every step was signed by that wallet; our relayer only paid NEAR gas.
+
+| Step | What happened | Transaction |
+|---|---|---|
+| 1. Pay | 0.50 USDC sent from MetaMask on Base to a 1Click deposit address | [Base 0x35e06256…](https://basescan.org/tx/0x35e06256083275aab864aa30bb6ad6aabd5c8045a9dcedfc57d9db67a149bff2) |
+| 2. Arrive | 0.4999 USDC credited in NEAR Intents to the wallet's own account (`0x16db…d8a5`) | [Fahqjwxx…](https://nearblocks.io/txns/FahqjwxxRywSRYHsGt7ZAHLe9A6YtKDNxKh3V9599xjJ) |
+| 3. Swap | The wallet's signed 1Click swap: 0.2408 USDC → 368 sats of BTC | [4UnCMPhS…](https://nearblocks.io/txns/4UnCMPhSVa5Nu4X4PYLeSdkVQyf6SYGkkZuTvdU24UAX) |
+| 4. Buy | The wallet's signed buy, relayed: the basket goes into the coin's vault and **102,064 $DEGEN** mint into the wallet's NEAR Intents account | [Hd6s4wEF…](https://nearblocks.io/txns/Hd6s4wEFpYdcyb1xTu2p3iycr1HB3t1N1mxcNRXsxhCb) |
+| 5. Sell | The wallet's signed sell, relayed: the coin burns the tokens and pays the basket back | [2Pv3XVJn…](https://nearblocks.io/txns/2Pv3XVJnGx6NhMAj1xBjShwsB4VeeF8akTa8xQzu87p9) |
+| 6. Cash out USDC | 0.2550 USDC → 0.2526 USDC on Base | [Base 0x250a7700…](https://basescan.org/tx/0x250a770040122fc35683fb10fbe61f947d739143a32f618816041c67ed8b8ded) |
+| 7. Cash out BTC | 361 sats → 0.2328 USDC on Base | [Base 0x82c61cb0…](https://basescan.org/tx/0x82c61cb00f28d7e8c7140ef6f8b9ed9054fef24bda77ec4a503c6584bcd4ce2a) |
+
+Checks anyone can rerun, all read-only:
+
+```bash
+pnpm install
+pnpm --filter scripts intents:check     # mainnet NEAR Intents accepts MetaMask and Phantom signatures: 8 PASS
+SITE=https://basketcase-near.vercel.app pnpm --filter scripts mainnet:dryrun degen.basketcase.near   # 5 PASS, no money moves
+pnpm verify                             # every offline check: Rust, simulator, unit, typecheck, browser: all PASS
+```
+
+**Honest status:** the mainnet coin is live and tradeable, and the MetaMask path on Base has done one full real round trip (above). The Phantom path on Solana is built and its signatures are checked against mainnet NEAR Intents, but no real Solana funds have moved through it yet. Unlike testnet coins, this demo coin keeps an access key so it can be deleted and its storage NEAR recovered after judging. On testnet, every action (launch, buy, sell, vote, auction, graduation, Rhea listing, the X card) runs end to end with test tokens, checked by an automated live browser test.
+
 ## NEAR memes, meme.cooking and Rhea (run on testnet)
 
 A coin made of NEAR's own memes, run through its whole life: launch, fair launch, trading, a holder vote that swaps an asset, graduation into an index, and the automatic Rhea listing. **We ran this on NEAR testnet because we don't have funds on mainnet for it at this moment**; it uses the same contracts and the same keeper as mainnet, with test tokens standing in for JAMBO, BLACKDRAGON, SHITZU and PEPE.
@@ -118,45 +155,8 @@ Two earlier testnet coins graduated and were listed the same way: $AI ([pool #29
 
 Each coin is its own NEAR contract, so launching one needs NEAR for the contract's storage (NEAR charges about 1 NEAR per 100 KB).
 
-- **Testnet:** open **Launch** in the app, pick the basket and the weights, and launch. It takes a **5 test-NEAR** deposit; test NEAR is free from the [testnet faucet](https://near-faucet.io/).
 - **Mainnet:** there is no Launch button yet (no mainnet factory). A coin is deployed with `scripts/src/mainnet-coin.ts`, as $DEGEN was: about **3.84 NEAR** of storage plus a few cents of gas. That NEAR isn't spent: a directly deployed coin returns it when it is deleted (`scripts/src/mainnet-cleanup.ts`). A factory-launched coin has no keys, so its storage stays locked for good.
-
-## Live on NEAR mainnet
-
-$DEGEN (50% BTC, 50% USDC) is deployed at [`degen.basketcase.near`](https://nearblocks.io/address/degen.basketcase.near).
-
-| Step | Transaction |
-|---|---|
-| Master account `basketcase.near` registered | [GFUK9C6z…](https://nearblocks.io/txns/GFUK9C6zUKa2RTx27yuamJa1Gv4oPJvFHFDitm7r42kj) |
-| Coin account `degen.basketcase.near` created | [ZjHSwTBL…](https://nearblocks.io/txns/ZjHSwTBL3QgaMrdZSwE7NVqiA1scTZm8mxnMFJ4jJgk) |
-| Coin contract deployed and initialised (`new`) | [GXP7y1NP…](https://nearblocks.io/txns/GXP7y1NPvSz7caavk7mwCq9FeNoA2J2xT3ENLPug5DBE) |
-| NEAR Intents registered on the coin (`storage_deposit`) | [2GRnJQf7…](https://nearblocks.io/txns/2GRnJQf7oGdSwDKo6x1ZU9scssqBC3BEYcdMYXpochgM) |
-| Gas relayer `router.basketcase.near` created | [2T82V7a3…](https://nearblocks.io/txns/2T82V7a3nbr6M8zBXpHPkzbZjppzSyrBfGAYfhMN6cb2) |
-
-### First real round trip: Base → $DEGEN → Base
-
-A MetaMask wallet paid **$0.50 USDC on Base**, bought $DEGEN, sold it, and cashed out **$0.485 USDC back on Base** (1.5¢ in fees: 1% to buy, 1% to sell, and swap spreads). Every step was signed by that wallet; our relayer only paid NEAR gas.
-
-| Step | What happened | Transaction |
-|---|---|---|
-| 1. Pay | 0.50 USDC sent from MetaMask on Base to a 1Click deposit address | [Base 0x35e06256…](https://basescan.org/tx/0x35e06256083275aab864aa30bb6ad6aabd5c8045a9dcedfc57d9db67a149bff2) |
-| 2. Arrive | 0.4999 USDC credited in NEAR Intents to the wallet's own account (`0x16db…d8a5`) | [Fahqjwxx…](https://nearblocks.io/txns/FahqjwxxRywSRYHsGt7ZAHLe9A6YtKDNxKh3V9599xjJ) |
-| 3. Swap | The wallet's signed 1Click swap: 0.2408 USDC → 368 sats of BTC | [4UnCMPhS…](https://nearblocks.io/txns/4UnCMPhSVa5Nu4X4PYLeSdkVQyf6SYGkkZuTvdU24UAX) |
-| 4. Buy | The wallet's signed buy, relayed: the basket goes into the coin's vault and **102,064 $DEGEN** mint into the wallet's NEAR Intents account | [Hd6s4wEF…](https://nearblocks.io/txns/Hd6s4wEFpYdcyb1xTu2p3iycr1HB3t1N1mxcNRXsxhCb) |
-| 5. Sell | The wallet's signed sell, relayed: the coin burns the tokens and pays the basket back | [2Pv3XVJn…](https://nearblocks.io/txns/2Pv3XVJnGx6NhMAj1xBjShwsB4VeeF8akTa8xQzu87p9) |
-| 6. Cash out USDC | 0.2550 USDC → 0.2526 USDC on Base | [Base 0x250a7700…](https://basescan.org/tx/0x250a770040122fc35683fb10fbe61f947d739143a32f618816041c67ed8b8ded) |
-| 7. Cash out BTC | 361 sats → 0.2328 USDC on Base | [Base 0x82c61cb0…](https://basescan.org/tx/0x82c61cb00f28d7e8c7140ef6f8b9ed9054fef24bda77ec4a503c6584bcd4ce2a) |
-
-Checks anyone can rerun, all read-only:
-
-```bash
-pnpm install
-pnpm --filter scripts intents:check     # mainnet NEAR Intents accepts MetaMask and Phantom signatures: 8 PASS
-SITE=https://basketcase-near.vercel.app pnpm --filter scripts mainnet:dryrun degen.basketcase.near   # 5 PASS, no money moves
-pnpm verify                             # every offline check: Rust, simulator, unit, typecheck, browser: all PASS
-```
-
-**Honest status:** the mainnet coin is live and tradeable, and the MetaMask path on Base has done one full real round trip (above). The Phantom path on Solana is built and its signatures are checked against mainnet NEAR Intents, but no real Solana funds have moved through it yet. Unlike testnet coins, this demo coin keeps an access key so it can be deleted and its storage NEAR recovered after judging. On testnet, every action (launch, buy, sell, vote, auction, graduation, Rhea listing, the X card) runs end to end with test tokens, checked by an automated live browser test.
+- **Testnet:** open **Launch** in the app, pick the basket and the weights, and launch. It takes a **5 test-NEAR** deposit; test NEAR is free from the [testnet faucet](https://near-faucet.io/).
 
 ## Built with
 

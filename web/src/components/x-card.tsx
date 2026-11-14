@@ -16,6 +16,8 @@ import type { Trade } from "@/lib/history";
 import { buFloatUsd, buToUsdN, priceUnit, usd } from "@/lib/money";
 import { recordBuy } from "@/lib/mybuys";
 import { GUEST_ENABLED, useWallet, type WalletMethod } from "@/lib/wallet";
+import { useXWallet, type XChain } from "@/lib/xwallet";
+import { hasMetaMask, hasPhantom } from "@/lib/xwallets";
 import { ChainIcon, TokenIcon, WalletIcon } from "./token-icon";
 import { CoinProvider, useCoin, useCoinSnapshot, useHistoryFeed, useMarket, useNumbers } from "./coin/context";
 import { useTx } from "./tx";
@@ -62,6 +64,20 @@ function Card() {
   const n = useNumbers();
   const m = useMarket();
   const { accountId, connect, disconnect, ensureFunded, method, funding } = useWallet();
+  const { xwallet, connectX, disconnectX } = useXWallet();
+  const crossChain = NET.swapRoute === "oneclick";
+  const [has, setHas] = useState({ mm: false, ph: false });
+  useEffect(() => setHas({ mm: hasMetaMask(), ph: hasPhantom() }), []);
+  // MetaMask or Phantom from the Connect sheet: the same wallet the site's header connects.
+  const pickX = async (chain: XChain) => {
+    setErr(undefined);
+    try {
+      await connectX(chain);
+      setMenu(false);
+    } catch (e) {
+      setErr(/reject|denied|cancel/i.test(String((e as Error)?.message)) ? "Cancelled in the wallet." : plain(e));
+    }
+  };
   const tx = useTx();
   const [amount, setAmount] = useState("20");
   const [stage, setStage] = useState<string | null>(null);
@@ -237,6 +253,11 @@ function Card() {
             <WalletIcon kind={method === "guest" ? "guest" : method === "privy" ? "email" : "near"} size={18} />
             {short(accountId).toUpperCase()}
           </button>
+        ) : xwallet ? (
+          <button type="button" className="xc-pill" onClick={() => (setBuyAfter(false), setMenu(true))} title={xwallet.user} aria-label="Wallet">
+            <WalletIcon kind={xwallet.chain === "base" ? "metamask" : "phantom"} size={18} />
+            {short(xwallet.user).toUpperCase()}
+          </button>
         ) : (
           <button
             type="button"
@@ -372,7 +393,7 @@ function Card() {
         <div className="xc-menu" role="dialog" aria-label={accountId ? "Wallet" : "Connect a wallet"} onClick={(e) => e.target === e.currentTarget && setMenu(false)}>
           <div className="xc-sheet">
             <div className="xc-sheet-h">
-              <h2>{accountId ? "Wallet" : NET.swapRoute === "oneclick" ? `Buy $${pay || 0} of $${ticker}` : buyAfter ? "Connect to buy" : "Connect"}</h2>
+              <h2>{accountId || (xwallet && !buyAfter) ? "Wallet" : crossChain && buyAfter ? `Buy $${pay || 0} of $${ticker}` : buyAfter ? "Connect to buy" : "Connect"}</h2>
               <button type="button" className="xc-x" onClick={() => setMenu(false)} aria-label="Close">
                 <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden>
                   <path d="M3.5 3.5l9 9m0-9l-9 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
@@ -392,15 +413,45 @@ function Card() {
                   }}
                 />
               </>
+            ) : xwallet && !buyAfter ? (
+              <>
+                <p className="xc-cap xc-acc">{xwallet.user}</p>
+                <Opt
+                  icon={<WalletIcon kind={xwallet.chain === "base" ? "metamask" : "phantom"} size={30} />}
+                  title="Disconnect"
+                  note={xwallet.chain === "base" ? "MetaMask · USDC on Base" : "Phantom · USDC on Solana"}
+                  onClick={() => {
+                    setMenu(false);
+                    disconnectX();
+                  }}
+                />
+              </>
+            ) : crossChain && buyAfter ? (
+              <div className="xc-x-chain">
+                <XChainBuy coin={snap.id} ticker={ticker} usd={amountOk ? pay : 0} minUsd={minUsd} />
+              </div>
             ) : (
               <>
-                {NET.swapRoute === "oneclick" && (
-                  <div className="xc-x-chain">
-                    <XChainBuy coin={snap.id} ticker={ticker} usd={amountOk ? pay : 0} minUsd={minUsd} />
-                  </div>
+                {crossChain && (
+                  <>
+                    <Opt
+                      icon={<WalletIcon kind="metamask" size={30} />}
+                      title="MetaMask · Base"
+                      note={has.mm ? "Pay with USDC on Base" : "Not found in this browser"}
+                      onClick={has.mm ? () => void pickX("base") : undefined}
+                      href={has.mm ? undefined : "https://metamask.io/download/"}
+                    />
+                    <Opt
+                      icon={<WalletIcon kind="phantom" size={30} />}
+                      title="Phantom · Solana"
+                      note={has.ph ? "Pay with USDC on Solana" : "Not found in this browser"}
+                      onClick={has.ph ? () => void pickX("solana") : undefined}
+                      href={has.ph ? undefined : "https://phantom.com/download"}
+                    />
+                  </>
                 )}
                 <Opt icon={<WalletIcon kind="near" size={30} />} title="NEAR wallet" note="Meteor, HOT, MyNearWallet, Intear" onClick={() => void pick("near", buyAfter)} />
-                <Opt icon={<WalletIcon kind="email" size={30} />} title="Email" note="Opens the coin page" href={`/c/${snap.id}`} />
+                {!crossChain && <Opt icon={<WalletIcon kind="email" size={30} />} title="Email" note="Opens the coin page" href={`/c/${snap.id}`} />}
                 {GUEST_ENABLED && <Opt icon={<WalletIcon kind="guest" size={30} />} title="Test key" note="Testnet only: a key in this browser" onClick={() => void pick("guest", buyAfter)} />}
               </>
             )}

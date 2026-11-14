@@ -658,8 +658,9 @@ export async function assetsInIntents(coin: string, intentsId: string): Promise<
   const [basket, prices] = await Promise.all([reader.coin(coin).getBasket(), reader.swapper.getPrices()]);
   const usd = Object.fromEntries(prices);
   const ids = Array.from(new Set([NEAR_USDC, ...basket.map((b) => b.token_id)]));
-  // Only amounts 1Click will take (about $1 and up); dust stays and isn't offered.
-  return Object.fromEntries(Object.entries(await held(intentsId, ids)).filter(([t, a]) => BigInt(a) > 0n && (rawToUsd(t, a, usd) ?? 0) >= 1));
+  // Only amounts 1Click will take: cash-outs to Base fill from $0.25 per asset (dry quotes, Nov 14, 2026). Smaller
+  // dust stays in NEAR Intents and isn't offered.
+  return Object.fromEntries(Object.entries(await held(intentsId, ids)).filter(([t, a]) => BigInt(a) > 0n && (rawToUsd(t, a, usd) ?? 0) >= 0.25));
 }
 
 /** What the browser sees. */

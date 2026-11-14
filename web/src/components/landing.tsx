@@ -4,7 +4,7 @@ import { formatCompact, graduationProgress, toNumber, type CoinMode } from "@bac
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { backedByLabel, backing } from "@/lib/backing";
+import { backedByLabel, backing, backedPct } from "@/lib/backing";
 import { BRAND, DIRECT_COINS, EXPLORER_ACCOUNT, NET, RHEA_POOLS, deployment, rheaPoolUrl } from "@/lib/config";
 
 /**
@@ -221,8 +221,8 @@ function Hero({ live, error, state, coins, coin, onPick }: { live: Live | undefi
           {state === "ok" && live && coin ? (
             <ul className="flex flex-col gap-2 text-[15px]">
               <li className="flex items-baseline gap-2">
-                <span className="num font-semibold text-ink">{Math.round(coin.share * 100)}%</span>
-                <span className="text-muted">of ${coin.ticker}&apos;s price is real assets</span>
+                <span className="num font-semibold text-ink">{backedPct(coin.share, coin.mcapUsd) === null ? "New" : `${backedPct(coin.share, coin.mcapUsd)}%`}</span>
+                <span className="text-muted">{backedPct(coin.share, coin.mcapUsd) === null ? `$${coin.ticker} is live; its first buy fills the vault` : `of $${coin.ticker}'s price is real assets`}</span>
               </li>
               <li className="flex items-baseline gap-2">
                 <span className="floor-tag text-[13px]">floor</span>
@@ -304,7 +304,7 @@ function Hl({ children }: { children: ReactNode }) {
 
 /** The top of a coin's screen, as a floating card: who it is, what it is worth, how much is backed. */
 function CoinCard({ coin }: { coin: LiveCoin }) {
-  const pct = Math.round(coin.share * 100);
+  const pct = backedPct(coin.share, coin.mcapUsd);
   const unit = priceUnit(coin.priceUsd);
   const w = Math.max(0, Math.min(100, coin.share * 100));
   return (
@@ -331,7 +331,7 @@ function CoinCard({ coin }: { coin: LiveCoin }) {
           <span className="floor-tag num">{usd(coin.floorUsd * unit.mult)}</span>
           <span className="label">floor {unit.label.replace("per ", "/ ").replace(" tokens", "").replace("token", "token")}</span>
         </span>
-        <StatLine v={`${pct}%`} k="backed" />
+        {pct === null ? <StatLine v="New" k="no buys yet" /> : <StatLine v={`${pct}%`} k="backed" />}
       </p>
       <p className="mt-3 flex items-center gap-2 text-sm text-muted">
         <span className="flex -space-x-1">
@@ -343,7 +343,7 @@ function CoinCard({ coin }: { coin: LiveCoin }) {
       </p>
       <div
         role="img"
-        aria-label={`$${coin.ticker}: ${usd(coin.backedUsd)} of its ${usd(coin.mcapUsd)} market cap is backed by ${coin.backedBy}, ${pct}%. ${usd(coin.hypeUsd)} is hype.`}
+        aria-label={`$${coin.ticker}: ${usd(coin.backedUsd)} of its ${usd(coin.mcapUsd)} market cap is backed by ${coin.backedBy}${pct === null ? " (no buys yet)" : `, ${pct}%`}. ${usd(coin.hypeUsd)} is hype.`}
         className="hatch relative mt-5 h-3 overflow-hidden rounded-full"
       >
         <span className="anim-w absolute inset-0 rounded-full bg-floor" style={{ clipPath: `inset(0 ${100 - w}% 0 0 round 999px)` }} />

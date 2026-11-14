@@ -3,7 +3,7 @@
 import { graduationProgress, toNumber, type CoinMode } from "@backed/client";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { backedByLabel, backing } from "@/lib/backing";
+import { backedByLabel, backing, backedPct } from "@/lib/backing";
 import { getReader, loadSummary, type CoinSummary } from "@/lib/data";
 import { changeLabel, changeOver, sparkPoints, type Trade } from "@/lib/history";
 import { fetchHistory } from "./coin/context";
@@ -389,7 +389,7 @@ function Stat({ v, k }: { v: string | null; k: string }) {
 /** The coin closest to graduating, made big. */
 function KingOfTheHill({ m }: { m: Market }) {
   const c = m.s.config;
-  const pct = Math.round(m.share * 100);
+  const pct = backedPct(m.share, m.mcapUsd);
   const prog = m.progress;
   return (
     <section aria-label="King of the hill" className="card relative isolate overflow-hidden p-6 sm:p-8">
@@ -419,7 +419,7 @@ function KingOfTheHill({ m }: { m: Market }) {
               ))}
             </span>
             <span>
-              <span className="font-semibold">{pct}%</span> <span className="text-muted">backed by {m.backedBy}</span>
+              <span className="font-semibold">{pct === null ? "New" : `${pct}%`}</span> <span className="text-muted">{pct === null ? "no buys yet · " : ""}backed by {m.backedBy}</span>
             </span>
           </p>
         </div>

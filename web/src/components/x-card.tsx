@@ -6,6 +6,7 @@
 // (container query units) and nothing scrolls. Only what a reader needs: the coin, its price over its
 // floor, what backs it (token and chain logos), an amount and Buy. Wallet choice opens on Buy.
 // Styles are scoped here, in the site's palette (DESIGN.md), so the site can change without breaking it.
+import { backedPct } from "@/lib/backing";
 import { faucetTx, planSell, prepareBuy, toNumber, usdToBu, type BuyPlan, type BuyQuote } from "@backed/client";
 import { Inter } from "next/font/google";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -74,7 +75,7 @@ function Card() {
   const busyRef = useRef(false);
   const ticker = snap.config.ticker;
   const unit = priceUnit(n.priceUsd);
-  const backedPct = Math.round(n.backing.share * 100);
+  const backedPctN = backedPct(n.backing.share, n.backing.mcapUsd);
   const change = m.change?.pct;
   const pay = Number(amount);
   const minUsd = minBuyUsd(rows);
@@ -278,7 +279,7 @@ function Card() {
           {px(n.floorUsd * unit.mult).replace("$", "")} <span className="xc-dim">FLOOR / {unit.mult === 1 ? "TOKEN" : unit.mult === 1000 ? "1K" : "1M"}</span>
         </span>
         <span>
-          {backedPct}% <span className="xc-dim">BACKED</span>
+          {backedPctN === null ? <>NEW <span className="xc-dim">NO BUYS YET</span></> : <>{backedPctN}% <span className="xc-dim">BACKED</span></>}
         </span>
       </p>
       <p className="xc-back">

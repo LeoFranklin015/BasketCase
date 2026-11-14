@@ -2,7 +2,7 @@
 
 import { formatCompact } from "@backed/client";
 import { useEffect, useRef, useState } from "react";
-import { splitBuy } from "@/lib/backing";
+import { splitBuy, backedPct } from "@/lib/backing";
 import { EXPLORER_ACCOUNT } from "@/lib/config";
 import { priceUnit, usd } from "@/lib/money";
 import { FloorBar, Monogram } from "../coin-bits";
@@ -64,7 +64,7 @@ export function MarketHeader() {
   // The floor bar previews a typed buy: the new tokens add their floor value to what is backed.
   const preview = buyPreview ? { backedUsd: n.backing.backedUsd + splitBuy(buyPreview.payUsd, buyPreview.floorValueUsd).backed } : null;
   const unit = priceUnit(n.priceUsd);
-  const pct = Math.round(n.backing.share * 100);
+  const pct = backedPct(n.backing.share, n.backing.mcapUsd);
   const chg = m.change?.pct;
 
   return (
@@ -124,7 +124,7 @@ export function MarketHeader() {
           }
           k="floor"
         />
-        <Stat v={`${pct}%`} k="backed" />
+        {pct === null ? <Stat v="New" k="no buys yet" /> : <Stat v={`${pct}%`} k="backed" />}
         <Stat
           v={
             <span data-testid="price-usd" title={`${usd(n.priceUsd)} per token`}>

@@ -33,6 +33,14 @@ export function splitBuy(payUsd: number, floorValueUsd: number): Split {
   return { backed, above: pay - backed, share: pay > 0 ? backed / pay : 0 };
 }
 
+/**
+ * The "% backed" figure, or null before a coin's first buy. With nothing sold, the price sits at the bottom of the
+ * curve, exactly where the floor starts, so the ratio is a meaningless 100%; screens say "no buys yet" instead.
+ */
+export function backedPct(share: number, mcapUsd: number): number | null {
+  return mcapUsd > 0 ? Math.round(share * 100) : null;
+}
+
 /** "BTC", "BTC + SOL", "BTC + SOL + ETH", "BTC + SOL + 3 more", biggest share first. */
 export function backedByLabel(rows: { symbol: string; share: number | null }[]): string {
   const sorted = [...rows].sort((a, b) => (b.share ?? 0) - (a.share ?? 0)).map((r) => r.symbol);

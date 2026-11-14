@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { backedByLabel, backing, fill, splitBuy } from "./backing";
+import { backedByLabel, backing, fill, splitBuy, backedPct } from "./backing";
 
 describe("backing", () => {
   it("splits the market cap into backed and hype", () => {
@@ -59,5 +59,13 @@ describe("fill", () => {
     expect(fill(140).clipPath).toBe("inset(0 0% 0 0)");
     expect(fill(-5).clipPath).toBe("inset(0 100% 0 0)");
     expect(fill(NaN).clipPath).toBe("inset(0 100% 0 0)");
+  });
+});
+
+describe("backedPct", () => {
+  it("is the rounded share once a coin has buys, and null before its first buy", () => {
+    expect(backedPct(0.934, 70_000)).toBe(93);
+    // Nothing sold: price and floor both sit at the curve's start, so 100% would mean nothing.
+    expect(backedPct(1, 0)).toBeNull();
   });
 });

@@ -10,8 +10,12 @@ describe("smallest buy", () => {
     expect(minBuyUsd([{ token_id: NV, share: 0.5 }, { token_id: "nep141:vvv", share: 0.5 }], "mainnet")).toBe(13);
     expect(minBuyUsd([{ token_id: NV, share: 0.25 }, { token_id: "x", share: 0.75 }], "mainnet")).toBe(26);
   });
-  it("ignores USDC (no swap) and is about $1-2 for ordinary assets", () => {
-    expect(minBuyUsd([{ token_id: "nep141:nbtc.bridge.near", share: 0.5 }, { token_id: USDC, share: 0.5 }], "mainnet")).toBe(3);
+  it("ignores USDC (no swap), uses measured minimums, and never goes below $1", () => {
+    // $DEGEN: 50% BTC (fills from $0.10) + 50% USDC → $1.
+    expect(minBuyUsd([{ token_id: "nep141:nbtc.bridge.near", share: 0.5 }, { token_id: USDC, share: 0.5 }], "mainnet")).toBe(1);
+    expect(minBuyUsd([{ token_id: USDC, share: 1 }], "mainnet")).toBe(1);
+    // Unmeasured assets keep about $1.15 per swap: half the basket → $3.
+    expect(minBuyUsd([{ token_id: "nep141:unmeasured", share: 0.5 }, { token_id: USDC, share: 0.5 }], "mainnet")).toBe(3);
   });
   it("is zero on testnet", () => {
     expect(minBuyUsd([{ token_id: NV, share: 0.5 }], "testnet")).toBe(0);

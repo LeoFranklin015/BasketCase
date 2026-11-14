@@ -103,9 +103,10 @@ function CoinLayout({ error, loadedAt }: { error?: Error; loadedAt: number }) {
           <MorePanel />
           <EmbedShare id={snapId} ticker={ticker} />
         </div>
+        {/* The trade column stays pinned while the page scrolls, but never taller than the screen: it scrolls on its own. */}
         <aside className="hidden scroll-mt-24 lg:block" aria-label="Trade" id="trade">
           {desktop && (
-            <div className="sticky top-24 space-y-4">
+            <div className="sticky top-24 -mx-3 -mt-2 max-h-[calc(100dvh-6.5rem)] space-y-4 overflow-y-auto overscroll-contain px-3 pt-2 pb-6 [scrollbar-width:thin]">
               <LaunchPanel />
               <TradePanel key={deskMode.n} initialMode={deskMode.mode} />
               <PositionPanel hideWhenSignedOut />

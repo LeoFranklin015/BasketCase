@@ -2,7 +2,7 @@
 
 How the code is laid out, how each flow runs end to end, and how to check it. Every statement points at a file, a test, a command or a transaction. The product overview is the [README](README.md), the full technical reference is [docs/technical.md](docs/technical.md); exact contract methods and JSON shapes are in [docs/interface.md](docs/interface.md).
 
-**Where it runs.** Everything is deployed on NEAR testnet only. NEAR Intents has no testnet, so testnet uses two stand-in contracts with the same call shapes (`contracts/mock-intents` for `intents.near`, `contracts/mock-swapper` for 1Click). Nothing is deployed on mainnet yet. The mainnet code paths are written, unit-tested and checked read-only against mainnet, but **no real funds have moved through them** (see [What is not tested](#what-is-not-tested)).
+**Where it runs.** The full product runs on NEAR testnet. NEAR Intents has no testnet, so testnet uses two stand-in contracts with the same call shapes (`contracts/mock-intents` for `intents.near`, `contracts/mock-swapper` for 1Click). On mainnet one coin, $DEGEN (`degen.basketcase.near`), is deployed directly with a gas-only relayer, and the MetaMask path has done one full real round trip from Base (see the [README](README.md#first-real-round-trip-base--degen--base)); the Phantom path has not moved real funds yet (see [What is not tested](#what-is-not-tested)).
 
 ## Repository layout
 
@@ -206,7 +206,7 @@ If a swap fails, nothing reaches the coin: the USDC and anything already swapped
 - `web/src/lib/server/xbuy.test.ts`: address mapping, base58, ERC-20 calldata, the exact bytes MetaMask signs.
 - `pnpm --filter scripts intents:check` (`scripts/src/intents-check.ts`): signs payloads with throwaway MetaMask-style and Phantom-style keys and runs them through mainnet `intents.near` `simulate_intents`, a view. Expected: **8 PASS** (for each wallet type: signature accepted; buy parses and stops at the balance; sell parses and stops at the balance; a tampered payload is rejected). Nothing is sent or spent.
 
-**Not tested yet:** no real funds have moved through this flow, and the mainnet coin is not deployed yet. The steps and costs to run it are in [docs/mainnet-runbook.md](docs/mainnet-runbook.md).
+**Tested on mainnet:** one full round trip through the MetaMask path: 0.50 USDC from Base, bought $DEGEN, sold it, cashed out 0.485 USDC to Base (transactions in the [README](README.md#first-real-round-trip-base--degen--base)). **Not tested yet:** the Phantom path with real Solana funds. The steps and costs are in [docs/mainnet-runbook.md](docs/mainnet-runbook.md).
 
 ## Testnet and mainnet
 
@@ -242,8 +242,8 @@ Needs Rust (stable) with the `wasm32-unknown-unknown` target, Node 22+, pnpm 10,
 
 ## What is not tested
 
-- No real funds have moved through any mainnet path: the NEAR-wallet buy through 1Click, the MetaMask/Phantom buy and sell, or the keeper's 1Click auction fills. What is checked is read-only: `pnpm --filter scripts intents:check` and `pnpm verify --mainnet-check`.
-- Nothing is deployed on mainnet yet. `deployments/mainnet.json` still has placeholder accounts.
+- On mainnet only the MetaMask path (USDC on Base) has moved real funds: one round trip of $0.50 (see the [README](README.md#first-real-round-trip-base--degen--base)). The Phantom path (Solana), the NEAR-wallet buy through 1Click and the keeper's 1Click auction fills have not. Read-only checks: `pnpm --filter scripts intents:check`, `pnpm --filter scripts mainnet:dryrun`, `pnpm verify --mainnet-check`.
+- Mainnet runs one coin deployed directly (no factory); `deployments/mainnet.json` lists it.
 - The automatic Rhea listing has run on testnet only.
 
 Trust assumptions (the factory key, the price reporter, the vault host, the cross-chain relayer) are listed in [docs/technical.md](docs/technical.md#trust-assumptions).

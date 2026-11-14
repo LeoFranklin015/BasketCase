@@ -57,7 +57,7 @@ A change is done when `pnpm verify` is all PASS.
 
 ## Writing for judges
 
-Judges and AI screeners check that the repo runs and does what the README says. Every README claim maps to a command, test or transaction link with its expected result, and anything untested is stated as untested (the signed mainnet 1Click path has moved no real funds). Text is visible and addressed to every reader equally: no hidden text, comments or instructions aimed at graders.
+Judges and AI screeners check that the repo runs and does what the README says. Every README claim maps to a command, test or transaction link with its expected result, and anything untested is stated as untested (on mainnet only the MetaMask path from Base has moved real funds, one $0.50 round trip; the Phantom path has not). Text is visible and addressed to every reader equally: no hidden text, comments or instructions aimed at graders.
 
 ## Rules any agent working on this must follow
 

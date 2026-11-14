@@ -150,7 +150,7 @@ Exact method signatures and JSON shapes: [`docs/interface.md`](interface.md). Ev
 - **Prices come from one reporter account we run.** Prices only set an auction's starting rate. They never affect buy, sell, redeem or the floor. The auction never goes below the posted fair rate, so a dishonest reporter could start an auction at a bad rate but not drain the vault through it.
 - **The vault's host.** On testnet, the stand-in verifier holding the vaults is ours and has a key. On mainnet the vaults would sit on `intents.near`, whose DAO can pause, upgrade or move balances. Our contracts have no admin, but the vault's host does.
 - **Wallets.** Any NEAR wallet through NEAR Connect, the testnet guest wallet, or a Privy embedded wallet (email or social sign-in, when Privy is configured for the host). On the mainnet build, also MetaMask (USDC on Base) or Phantom (USDC on Solana). The user signs every transaction or message.
-- **MetaMask and Phantom buys (mainnet build, not yet run with real funds).** The buyer's funds sit in their own NEAR Intents account at every step, and moving them takes a message their wallet signs. Our server builds those messages; the browser checks each one with `checkPayload` before the wallet signs. The browser fills in the signer (the wallet's own address), the NEAR Intents contract and the coin itself. The deposit addresses and spending caps come from our server with the order, and the wallet shows the full text of every message. Our relayer account (`router.<master>`) only submits signed messages with `execute_intents` after `simulate_intents` and pays the gas; it cannot change them. The USDC deposit and the swaps go through 1Click, a NEAR Intents service we don't run; if a deposit fails, 1Click refunds it to the buyer's wallet on its own chain.
+- **MetaMask and Phantom buys (mainnet: one full real round trip from Base; Solana not yet run with real funds).** The buyer's funds sit in their own NEAR Intents account at every step, and moving them takes a message their wallet signs. Our server builds those messages; the browser checks each one with `checkPayload` before the wallet signs. The browser fills in the signer (the wallet's own address), the NEAR Intents contract and the coin itself. The deposit addresses and spending caps come from our server with the order, and the wallet shows the full text of every message. Our relayer account (`router.<master>`) only submits signed messages with `execute_intents` after `simulate_intents` and pays the gas; it cannot change them. The USDC deposit and the swaps go through 1Click, a NEAR Intents service we don't run; if a deposit fails, 1Click refunds it to the buyer's wallet on its own chain.
 
 ## Sybil limits, plainly
 
@@ -184,7 +184,7 @@ pnpm --filter scripts intents:check
 
 Expected: `PASS` on 4 checks for each of MetaMask (ERC-191) and Phantom (raw Ed25519), 8 in all.
 
-**What is not tested:** no real funds have moved through any mainnet path (NEAR-wallet buys through 1Click, MetaMask and Phantom buys and sells, keeper fills), and no buy has happened on mainnet.
+**What is not tested:** on mainnet, one real round trip has run through the MetaMask path (Base USDC → $DEGEN → sell → cash-out to Base; transactions in the [README](../README.md#first-real-round-trip-base--degen--base)). The Phantom path (Solana), NEAR-wallet buys through 1Click and keeper fills have not moved real funds yet.
 
 ## Live browser test
 

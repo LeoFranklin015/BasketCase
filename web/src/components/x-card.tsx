@@ -71,6 +71,19 @@ function Card() {
   // MetaMask or Phantom from the Connect sheet: the same wallet the site's header connects.
   const pickX = async (chain: XChain) => {
     setErr(undefined);
+    // Inside a post on X the card is a frame on another site, where MetaMask and Phantom can't sign:
+    // continue on the coin page in a new tab instead.
+    let framed = true;
+    try {
+      framed = window.self !== window.top;
+    } catch {
+      framed = true;
+    }
+    if (framed) {
+      window.open(`${window.location.origin}/c/${encodeURIComponent(snap.id)}?pay=${chain}&usd=${pay || 20}`, "_blank", "noopener");
+      setMenu(false);
+      return;
+    }
     try {
       await connectX(chain);
       setMenu(false);

@@ -2,12 +2,13 @@
 // cache and one failover list (src/lib/rpc.ts) instead of each browser hitting the free RPCs.
 // Only `call_function` views on this app's own contracts pass; nothing can be signed or sent.
 import { NextResponse } from "next/server";
-import { DATA_MODE, deployment } from "@/lib/config";
+import { DATA_MODE, DIRECT_COINS, deployment } from "@/lib/config";
 import { rpcPost } from "@/lib/rpc";
 
 export const dynamic = "force-dynamic";
 
-const OURS = new Set([deployment.factory, deployment.verifier, deployment.swapper]);
+// The factory, its coins, and coins deployed directly (the mainnet demo coin has no factory).
+const OURS = new Set([deployment.factory, deployment.verifier, deployment.swapper, ...DIRECT_COINS.map((c) => c.account_id)]);
 const allowed = (id: unknown) => typeof id === "string" && (OURS.has(id) || id.endsWith(`.${deployment.factory}`));
 
 export async function POST(req: Request) {

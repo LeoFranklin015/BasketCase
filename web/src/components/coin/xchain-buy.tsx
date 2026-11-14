@@ -44,7 +44,22 @@ const friendly = (e: unknown) => {
   return /reject|denied|cancel/i.test(m) ? "Cancelled in the wallet." : m;
 };
 
-export function XChainBuy({ coin, ticker, usd, minUsd = 0, className }: { coin: string; ticker: string; usd: number; minUsd?: number; className?: string }) {
+export function XChainBuy({
+  coin,
+  ticker,
+  usd,
+  minUsd = 0,
+  className,
+  suggest,
+}: {
+  coin: string;
+  ticker: string;
+  usd: number;
+  minUsd?: number;
+  className?: string;
+  /** A wallet the page was opened for (from the X card): its button is highlighted and scrolled into view. */
+  suggest?: Chain;
+}) {
   const below = minUsd > 0 && usd < minUsd;
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string>();
@@ -60,6 +75,19 @@ export function XChainBuy({ coin, ticker, usd, minUsd = 0, className }: { coin: 
   const signing = useRef<string | null>(null);
   const [wallets, setWallets] = useState({ mm: false, ph: false });
   useEffect(() => setWallets({ mm: hasMetaMask(), ph: hasPhantom() }), []);
+  // Inside another site's frame (the X card in a post), wallets can't sign: pay opens the coin page in a new tab.
+  const [framed, setFramed] = useState(false);
+  useEffect(() => {
+    try {
+      setFramed(window.self !== window.top);
+    } catch {
+      setFramed(true);
+    }
+  }, []);
+  const payRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (suggest) requestAnimationFrame(() => payRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }));
+  }, [suggest]);
   // A connected wallet (header or here): show what it holds right away.
   useEffect(() => {
     if (wallet) void refreshHolding(wallet);
@@ -159,6 +187,10 @@ export function XChainBuy({ coin, ticker, usd, minUsd = 0, className }: { coin: 
   };
 
   const pay = async (chain: Chain) => {
+    if (framed) {
+      window.open(`${window.location.origin}/c/${encodeURIComponent(coin)}?pay=${chain}&usd=${usd}`, "_blank", "noopener");
+      return;
+    }
     setErr(undefined);
     setOrder(null);
     setSentTx(null);
@@ -235,9 +267,27 @@ export function XChainBuy({ coin, ticker, usd, minUsd = 0, className }: { coin: 
 .xb-bar{background:linear-gradient(90deg,transparent,#111 40%,#FFE14D 60%,transparent);width:40%;animation:xb-bar 1.4s ease-in-out infinite}
 @media (prefers-reduced-motion:reduce){.xb-spin,.xb-bar{animation:none}}`}</style>
       {!order ? (
-        <div className="grid gap-2.5">
-          <PayButton onClick={() => void pay("base")} disabled={!!busy || !(usd > 0) || below} wallet="metamask" chain="base" label={busy === "base" ? "Confirm in MetaMask…" : `MetaMask · $${usd || 0} USDC on Base`} missing={!wallets.mm} />
-          <PayButton onClick={() => void pay("solana")} disabled={!!busy || !(usd > 0) || below} wallet="phantom" chain="solana" label={busy === "solana" ? "Confirm in Phantom…" : `Phantom · $${usd || 0} USDC on Solana`} missing={!wallets.ph} />
+        <div ref={payRef} className="grid gap-2.5">
+          <PayButton
+            onClick={() => void pay("base")}
+            disabled={!!busy || !(usd > 0) || below}
+            wallet="metamask"
+            chain="base"
+            label={busy === "base" ? "Confirm in MetaMask…" : `MetaMask · $${usd || 0} USDC on Base`}
+            missing={!framed && !wallets.mm}
+            highlight={suggest === "base"}
+          />
+          <PayButton
+            onClick={() => void pay("solana")}
+            disabled={!!busy || !(usd > 0) || below}
+            wallet="phantom"
+            chain="solana"
+            label={busy === "solana" ? "Confirm in Phantom…" : `Phantom · $${usd || 0} USDC on Solana`}
+            missing={!framed && !wallets.ph}
+            highlight={suggest === "solana"}
+          />
+          {framed && <p className="text-xs text-[#6E6E73]">Opens Basketcase in a new tab, where your wallet can sign.</p>}
+          {suggest && !framed && <p className="text-sm font-semibold">Tap the highlighted button to pay ${usd || 0} from your wallet.</p>}
           {below && <p className="text-sm font-semibold text-[#E5484D]">Smallest buy here is ${fmtMin(minUsd)}.</p>}
           <p className="text-xs leading-snug text-[color:var(--muted,#6E6E73)]">
             One USDC transfer into NEAR Intents under your own wallet&apos;s address, then you sign the swaps and the buy as messages. Your wallet
@@ -389,7 +439,23 @@ function ActionPill({ onClick, disabled, label }: { onClick: () => void; disable
   );
 }
 
-function PayButton({ onClick, disabled, wallet, chain, label, missing }: { onClick: () => void; disabled: boolean; wallet: "metamask" | "phantom"; chain: "base" | "solana"; label: string; missing: boolean }) {
+function PayButton({
+  onClick,
+  disabled,
+  wallet,
+  chain,
+  label,
+  missing,
+  highlight,
+}: {
+  onClick: () => void;
+  disabled: boolean;
+  wallet: "metamask" | "phantom";
+  chain: "base" | "solana";
+  label: string;
+  missing: boolean;
+  highlight?: boolean;
+}) {
   if (missing) {
     return (
       <a
@@ -404,7 +470,12 @@ function PayButton({ onClick, disabled, wallet, chain, label, missing }: { onCli
     );
   }
   return (
-    <button type="button" onClick={onClick} disabled={disabled} className="flex h-[52px] items-center gap-3 rounded-full bg-[#111] px-4 text-[15px] font-semibold text-white disabled:opacity-60">
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`flex h-[52px] items-center gap-3 rounded-full bg-[#111] px-4 text-[15px] font-semibold text-white disabled:opacity-60 ${highlight ? "ring-4 ring-[#FFE14D] ring-offset-2" : ""}`}
+    >
       <span className="relative inline-flex">
         <WalletIcon kind={wallet} size={28} />
         <span className="absolute -bottom-0.5 -right-1">

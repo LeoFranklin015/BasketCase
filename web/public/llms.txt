@@ -1,4 +1,4 @@
-# Backed (working name)
+# Basketcase
 
 > A memecoin launchpad on NEAR where every coin holds a basket of assets in its own vault and the contract computes a floor from that vault. Fees and burns raise the floor. Holders burn tokens to challenge or defend basket assets; a winning challenge swaps the asset through a Dutch auction. At 20,000 basket units the coin graduates into a built-in pool and every token becomes redeemable for a share of the vault. NEAR HACKATHON entry (November 2026), Memecoins With Mechanics track.
 

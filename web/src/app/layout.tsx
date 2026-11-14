@@ -1,14 +1,15 @@
 import "@fontsource-variable/jetbrains-mono";
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import localFont from "next/font/local";
 import type { ReactNode } from "react";
 import { BRAND, NET } from "@/lib/config";
 import { WalletProvider } from "@/lib/wallet";
 import { XWalletProvider } from "@/lib/xwallet";
 
 // One face: Inter with its optical-size axis, from captions to the big money numbers.
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap", axes: ["opsz"] });
+// Inter, self-hosted (variable: weight and optical size), so builds and tests need no font download.
+const inter = localFont({ src: "./fonts/inter-latin-opsz-normal.woff2", variable: "--font-inter", display: "swap", weight: "100 900" });
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),

@@ -8,7 +8,7 @@
 // Styles are scoped here, in the site's palette (DESIGN.md), so the site can change without breaking it.
 import { backedPct } from "@/lib/backing";
 import { faucetTx, planSell, prepareBuy, toNumber, usdToBu, type BuyPlan, type BuyQuote } from "@backed/client";
-import { Inter } from "next/font/google";
+import localFont from "next/font/local";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { BRAND, EXPLORER_TX, FAUCET_AMOUNT, NET, PAY_TOKEN_ID } from "@/lib/config";
 import { getReader, swapperId, verifierId } from "@/lib/data";
@@ -26,7 +26,7 @@ import { fmtMin, minBuyUsd } from "@/lib/minbuy";
 import { isOndoStock } from "@/lib/icons";
 
 // The card loads its own face so it never depends on what the site layout loads.
-const inter = Inter({ subsets: ["latin"], variable: "--font-xc", display: "swap" });
+const inter = localFont({ src: "../app/fonts/inter-latin-opsz-normal.woff2", variable: "--font-xc", display: "swap", weight: "100 900" });
 
 const PRESETS = ["5", "20", "50"];
 const SLIP_BPS = 100;

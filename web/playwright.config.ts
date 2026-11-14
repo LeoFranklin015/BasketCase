@@ -5,7 +5,7 @@ const PORT = 3123;
 export default defineConfig({
   testDir: "./e2e",
   // live.spec.ts sends real testnet transactions; it has its own config (playwright.live.config.ts).
-  testIgnore: /live\.spec\.ts$/,
+  testIgnore: /live(-mainnet)?\.spec\.ts$/,
   timeout: 60_000,
   fullyParallel: false,
   reporter: "list",

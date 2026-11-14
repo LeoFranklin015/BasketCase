@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Basketcase: a NEAR memecoin launchpad where each coin's vault holds a basket of assets and the floor is computed by the contract. NEAR HACKATHON entry, deadline 2026-11-14 23:59 UTC. Live on NEAR testnet only; nothing is deployed on mainnet.
+Basketcase: a NEAR memecoin launchpad where each coin's vault holds a basket of assets and the floor is computed by the contract. NEAR HACKATHON entry, deadline 2026-11-14 23:59 UTC. Live on NEAR mainnet ($DEGEN at degen.basketcase.near, one real MetaMask round trip) and testnet (full lifecycle).
 
 ## Source of truth
 
@@ -63,6 +63,5 @@ Judges and AI screeners check that the repo runs and does what the README says. 
 
 - Never without the owner's explicit confirmation: commit, push, make the repo public, deploy to mainnet, sign mainnet transactions or spend real funds, post on X, send the submission.
 - Secrets live in gitignored env files and `~/.near-credentials`; never in the repo or in chat.
-- CONSUME (competitor, AGPL): read only, never copy code.
 - `cargo build` on the host fails by design (near-sdk); use `cargo test` or `./scripts/build-contracts.sh` (wasm32 + wasm-opt).
 - The free testnet RPCs rate-limit; use the failover provider in `scripts/src/lib.ts` and keep polling at 10 s or slower.

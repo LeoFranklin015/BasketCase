@@ -292,7 +292,7 @@ components:
 
 # Design System
 
-The product name lives in the frontmatter `name` above and, in code, only in `BRAND` (`src/lib/config.ts`). The name is a working name. This file never repeats it; the wordmark renders `BRAND.name` lowercased.
+The product name lives in the frontmatter `name` above and, in code, only in `BRAND` (`src/lib/config.ts`). This file never repeats it; the wordmark renders `BRAND.name` lowercased.
 
 ## Overview
 

@@ -1,0 +1,105 @@
+{
+  "network": "testnet",
+  "rpc": "https://rpc.testnet.fastnear.com",
+  "factory": "pad.backedlab.testnet",
+  "verifier": "intents.backedlab.testnet",
+  "swapper": "swapper.backedlab.testnet",
+  "reporter": "reporter.backedlab.testnet",
+  "protocol": "protocol.backedlab.testnet",
+  "tokens": [
+    {
+      "symbol": "USDC",
+      "token_id": "nep141:usdc.mock",
+      "decimals": 6
+    },
+    {
+      "symbol": "BTC",
+      "token_id": "nep141:btc.mock",
+      "decimals": 8
+    },
+    {
+      "symbol": "ETH",
+      "token_id": "nep141:eth.mock",
+      "decimals": 18
+    },
+    {
+      "symbol": "SOL",
+      "token_id": "nep141:sol.mock",
+      "decimals": 9
+    },
+    {
+      "symbol": "PEPE",
+      "token_id": "nep141:pepe.mock",
+      "decimals": 18
+    },
+    {
+      "symbol": "DOGE",
+      "token_id": "nep141:doge.mock",
+      "decimals": 8
+    },
+    {
+      "symbol": "WIF",
+      "token_id": "nep141:wif.mock",
+      "decimals": 6
+    },
+    {
+      "symbol": "BONK",
+      "token_id": "nep141:bonk.mock",
+      "decimals": 5
+    },
+    {
+      "symbol": "NVDA",
+      "token_id": "nep141:nvda.mock",
+      "decimals": 18
+    },
+    {
+      "symbol": "BLACKDRAGON",
+      "token_id": "nep141:blackdragon.mock",
+      "decimals": 18
+    },
+    {
+      "symbol": "SHITZU",
+      "token_id": "nep141:shitzu.mock",
+      "decimals": 18
+    },
+    {
+      "symbol": "JAMBO",
+      "token_id": "nep141:jambo.mock",
+      "decimals": 18
+    },
+    {
+      "symbol": "SHIB",
+      "token_id": "nep141:shib.mock",
+      "decimals": 18
+    },
+    {
+      "symbol": "TRUMP",
+      "token_id": "nep141:trump.mock",
+      "decimals": 6
+    },
+    {
+      "symbol": "KAITO",
+      "token_id": "nep141:kaito.mock",
+      "decimals": 18
+    },
+    {
+      "symbol": "VVV",
+      "token_id": "nep141:vvv.mock",
+      "decimals": 18
+    },
+    {
+      "symbol": "PUBLIC",
+      "token_id": "nep141:public.mock",
+      "decimals": 18
+    },
+    {
+      "symbol": "ITLX",
+      "token_id": "nep141:itlx.mock",
+      "decimals": 18
+    }
+  ],
+  "rhea_pools": {
+    "demo1283-0.pad.backedlab.testnet": 2975,
+    "ai-0.pad.backedlab.testnet": 2977
+  }
+}

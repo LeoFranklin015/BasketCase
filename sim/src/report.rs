@@ -176,6 +176,8 @@ pub(crate) struct AgentsOut {
     pub(crate) panic_drop_pct: u32,
     pub(crate) panic_pct_per_day: f64,
     pub(crate) rituals: bool,
+    pub(crate) seat_weight_pct: f64,
+    pub(crate) basket_daily_vol_pct: f64,
 }
 
 fn agents_out(s: &Scenario) -> AgentsOut {
@@ -191,6 +193,8 @@ fn agents_out(s: &Scenario) -> AgentsOut {
         panic_drop_pct: s.panic_drop_pct,
         panic_pct_per_day: ppm_pct(s.panic_ppm),
         rituals: s.rituals,
+        seat_weight_pct: s.seat_weight_bps as f64 / 100.0,
+        basket_daily_vol_pct: s.basket_vol_ppm as f64 / 10_000.0,
     }
 }
 
@@ -378,7 +382,7 @@ mod tests {
         let out = generate(2).unwrap();
         let v: serde_json::Value = serde_json::from_str(&out.json).unwrap();
         let scenarios = v["scenarios"].as_array().unwrap();
-        assert_eq!(scenarios.len(), 4);
+        assert_eq!(scenarios.len(), 5);
         for s in scenarios {
             let days = s["days"].as_array().unwrap();
             assert_eq!(days.len(), 61);

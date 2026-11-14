@@ -27,7 +27,10 @@ pub const TAKE_PROFIT_PPM: u32 = 500_000;
 /// Whales dump in this many equal hourly chunks.
 pub const WHALE_DUMP_HOURS: u32 = 4;
 /// The challenged seat's weight: a $DEGEN-style basket of one anchored asset and one seat, 50/50.
+/// (The default; a scenario sets its own.)
 pub const SEAT_WEIGHT_BPS: u128 = 5_000;
+/// A three-asset meme basket ($COOK-style: JAMBO anchored, BLACKDRAGON, PEPE): each seat is a third.
+pub const MEME_SEAT_WEIGHT_BPS: u128 = 3_333;
 /// Solver's cut on the swap after a winning challenge, drawn per swap (bps of the slot's value).
 pub const SOLVER_CUT_BPS: (u32, u32) = (100, 200);
 /// Challengers aim for this multiple (percent) of the challenge minimum, drawn per epoch...
@@ -50,8 +53,10 @@ pub const EPOCH_BURN_CAP_BPS: u128 = 100;
 /// an hour.
 pub const ARB_CHUNK_BPS: u128 = 100;
 pub const ARB_MAX_ROUNDS: u32 = 50;
-/// Daily volatility of the basket's USD value, in ppm (3%).
+/// Daily volatility of the basket's USD value, in ppm (3%: majors like BTC and ETH with USDC).
 pub const BASKET_DAILY_VOL_PPM: i64 = 30_000;
+/// The same for a basket of memecoins (10% a day).
+pub const MEME_BASKET_DAILY_VOL_PPM: i64 = 100_000;
 
 #[derive(Clone, Debug)]
 pub struct Scenario {
@@ -76,6 +81,10 @@ pub struct Scenario {
     pub panic_drop_pct: u32,
     pub panic_ppm: u32,
     pub rituals: bool,
+    /// Share of the vault the challenged seat holds (bps).
+    pub seat_weight_bps: u128,
+    /// Daily volatility of the basket's USD value (ppm). Agents trade in BU; this moves the USD view.
+    pub basket_vol_ppm: i64,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -201,9 +210,10 @@ fn take_due(queue: &mut Vec<(u32, u128)>, hour: u32) -> Vec<u128> {
 
 /// One day's move of the basket's USD value: Irwin-Hall approximation of a normal draw
 /// (sum of 12 uniforms), integer only.
-fn basket_step(bu_usd: u128, rng: &mut ChaCha8Rng) -> u128 {
+fn basket_step(bu_usd: u128, vol_ppm: i64, rng: &mut ChaCha8Rng) -> u128 {
     let z_e4: i64 = (0..12).map(|_| rng.gen_range(0..10_000i64)).sum::<i64>() - 60_000;
-    let r_ppm = z_e4 * BASKET_DAILY_VOL_PPM / 10_000;
+    // Floored so a long run of bad days can't take the basket to zero or below.
+    let r_ppm = (z_e4 * vol_ppm / 10_000).max(-500_000);
     mul_div(bu_usd, (1_000_000 + r_ppm) as u128, 1_000_000)
 }
 
@@ -331,7 +341,7 @@ impl World<'_> {
         if at == 0 {
             let circ = self.coin.circulating();
             let margin = self.ritual.gen_range(CHALLENGE_MARGIN_PCT.0..=CHALLENGE_MARGIN_PCT.1);
-            let aim = self.coin.challenge_minimum(SEAT_WEIGHT_BPS) * margin as u128 / 100;
+            let aim = self.coin.challenge_minimum(self.s.seat_weight_bps) * margin as u128 / 100;
             let budget = self.tokens_for_burn_value(aim).clamp(
                 circ * CHALLENGE_BUDGET_BPS.0 / BPS,
                 circ * CHALLENGE_BUDGET_BPS.1 / BPS,
@@ -366,14 +376,14 @@ impl World<'_> {
             self.stats
                 .epoch_burn_bps
                 .push(self.epoch.burned * BPS / self.epoch.start_circ.max(1));
-            let min = self.coin.challenge_minimum(SEAT_WEIGHT_BPS);
+            let min = self.coin.challenge_minimum(self.s.seat_weight_bps);
             let min_tokens = self.tokens_for_burn_value(min);
             self.stats
                 .epoch_min_challenge_bps
                 .push(min_tokens * BPS / self.coin.circulating().max(1));
             if self.epoch.tally > self.epoch.defense && self.epoch.tally >= min {
                 let cut = self.ritual.gen_range(SOLVER_CUT_BPS.0..=SOLVER_CUT_BPS.1) as u128;
-                let slot = mul_div(self.coin.owed(), SEAT_WEIGHT_BPS, BPS);
+                let slot = mul_div(self.coin.owed(), self.s.seat_weight_bps, BPS);
                 self.coin.swap_loss(mul_div(slot, cut, BPS))?;
                 self.stats.swaps += 1;
             }
@@ -478,7 +488,7 @@ pub fn run(s: &Scenario, seed: u64) -> Result<Run> {
         }
         if hour % 24 == 23 {
             w.coin.claim_fees()?;
-            w.bu_usd = basket_step(w.bu_usd, &mut w.basket);
+            w.bu_usd = basket_step(w.bu_usd, s.basket_vol_ppm, &mut w.basket);
             days.push(w.snapshot(day + 1)?);
             w.holders.retain(|h| h.tokens > 0 || h.kind != Kind::Retail);
         }
@@ -496,6 +506,10 @@ fn pump_arrivals(day: u32) -> u32 {
 
 fn graduation_arrivals(day: u32) -> u32 {
     if day < 10 { 150 } else { 10 }
+}
+
+fn meme_arrivals(day: u32) -> u32 {
+    if day < 7 { 30 } else { 8 }
 }
 
 impl Scenario {
@@ -517,6 +531,8 @@ impl Scenario {
             panic_drop_pct: 50,
             panic_ppm: 50_000,
             rituals: false,
+            seat_weight_bps: SEAT_WEIGHT_BPS,
+            basket_vol_ppm: BASKET_DAILY_VOL_PPM,
         };
         let war = Scenario {
             id: "challenge-war",
@@ -545,6 +561,8 @@ impl Scenario {
             panic_drop_pct: 40,
             panic_ppm: 200_000,
             rituals: false,
+            seat_weight_bps: SEAT_WEIGHT_BPS,
+            basket_vol_ppm: BASKET_DAILY_VOL_PPM,
         };
         let grad = Scenario {
             id: "graduation",
@@ -564,8 +582,32 @@ impl Scenario {
             panic_drop_pct: 50,
             panic_ppm: 50_000,
             rituals: false,
+            seat_weight_bps: SEAT_WEIGHT_BPS,
+            basket_vol_ppm: BASKET_DAILY_VOL_PPM,
         };
-        vec![steady, pump, war, grad]
+        let meme = Scenario {
+            id: "meme-basket",
+            title: "NEAR memes basket",
+            description: "A $COOK-style coin whose basket is three NEAR memecoins (JAMBO from \
+                meme.cooking anchored, BLACKDRAGON, PEPE), so each seat is a third of the vault and \
+                the basket's dollar value swings 10% a day instead of 3%. A hype week brings 30 \
+                buyers a day, then 8. Holders panic faster when under water, and every week they \
+                vote on a seat, as in the challenge war.",
+            launch_retail: 30,
+            early_holders: 6,
+            early_holder_bu: 250,
+            whales: 0,
+            whale_bu: (0, 0),
+            whale_dump_days: (0, 0),
+            arrivals_per_day: meme_arrivals,
+            churn_ppm: 25_000,
+            panic_drop_pct: 40,
+            panic_ppm: 120_000,
+            rituals: true,
+            seat_weight_bps: MEME_SEAT_WEIGHT_BPS,
+            basket_vol_ppm: MEME_BASKET_DAILY_VOL_PPM,
+        };
+        vec![steady, pump, war, grad, meme]
     }
 }
 
@@ -584,6 +626,24 @@ mod tests {
 
     fn scenario(id: &str) -> Scenario {
         Scenario::all().into_iter().find(|s| s.id == id).unwrap()
+    }
+
+    #[test]
+    fn a_meme_basket_floor_still_climbs_in_bu_while_its_dollar_value_swings_wider() {
+        let usd_floor = |r: &Run, d: usize| mul_div(r.days[d].floor, r.days[d].bu_usd, E18);
+        let (mut meme_usd, mut steady_usd) = (Vec::new(), Vec::new());
+        for seed in 0..6 {
+            let meme = run(&scenario("meme-basket"), seed).unwrap();
+            let steady = run(&scenario("steady"), seed).unwrap();
+            // In basket units the floor ends above where it started: votes burn, fees stay.
+            assert!(meme.days[60].floor > meme.days[0].floor, "seed {seed}");
+            assert!(meme.stats.epochs_closed > 0, "seed {seed}: votes ran");
+            meme_usd.push(usd_floor(&meme, 60));
+            steady_usd.push(usd_floor(&steady, 60));
+        }
+        // In dollars the meme basket's floor is spread far wider than a majors basket's.
+        let spread = |v: &[u128]| (*v.iter().max().unwrap() as f64) / (*v.iter().min().unwrap() as f64);
+        assert!(spread(&meme_usd) > spread(&steady_usd), "meme spread {} vs steady {}", spread(&meme_usd), spread(&steady_usd));
     }
 
     #[test]

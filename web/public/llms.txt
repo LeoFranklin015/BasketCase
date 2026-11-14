@@ -2,11 +2,10 @@
 
 > A memecoin launchpad on NEAR where every coin holds a basket of assets in its own vault and the contract computes a floor from that vault. Fees and burns raise the floor. Holders burn tokens to challenge or defend basket assets; a winning challenge swaps the asset through a Dutch auction. At 20,000 basket units the coin graduates into a built-in pool and every token becomes redeemable for a share of the vault. NEAR HACKATHON entry (November 2026), Memecoins With Mechanics track.
 
-Status: runs on NEAR testnet only. Testnet uses stand-in contracts for NEAR Intents (`intents.backedlab.testnet`) and 1Click (`swapper.backedlab.testnet`), and stand-in tokens (`nep141:*.mock`). Nothing is deployed on mainnet. The mainnet swap path (1Click, NEP-413 signed intents) is written and unit-tested but has not moved real funds.
+Status: live on NEAR mainnet and testnet. Mainnet: $DEGEN at degen.basketcase.near, bought and sold from MetaMask (USDC on Base) through NEAR Intents and 1Click in one real round trip; the Phantom (Solana) path has not moved real funds. Testnet uses stand-in contracts for NEAR Intents (`intents.backedlab.testnet`) and 1Click (`swapper.backedlab.testnet`), and stand-in tokens (`nep141:*.mock`).
 
 Hosted (testnet): https://basketcase-testnet.vercel.app
-Hosted (same code built for mainnet, not deployed there yet): https://basketcase-near.vercel.app
-Fallback (testnet, self-signed certificate): https://141.148.209.77:3000
+Hosted (mainnet): https://basketcase-near.vercel.app
 Try it: open /c/degen-0.pad.backedlab.testnet → Connect → Guest wallet (gas + 100 test USDC arrive by themselves) → Buy.
 
 ## Pages

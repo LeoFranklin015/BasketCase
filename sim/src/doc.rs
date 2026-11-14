@@ -5,7 +5,7 @@
 use crate::params::Params;
 use crate::report::{ppm_pct, whole_units, DayOut, ScenarioOut, SimOut, JSON_PATH};
 use crate::scenario::{
-    ARB_CHUNK_BPS, ARB_MAX_ROUNDS, BASKET_DAILY_VOL_PPM, CHALLENGE_BUDGET_BPS,
+    ARB_CHUNK_BPS, ARB_MAX_ROUNDS, BASKET_DAILY_VOL_PPM, MEME_BASKET_DAILY_VOL_PPM, MEME_SEAT_WEIGHT_BPS, CHALLENGE_BUDGET_BPS,
     CHALLENGE_MARGIN_PCT, CHALLENGE_PARTS, CHALLENGE_QUIET_HOURS, DAYS, DEFEND_DELAY_HOURS,
     DEFEND_PPM, DEFEND_SIZE_PCT, EPOCH_BURN_CAP_BPS, RETAIL_SIZES_BU, SEAT_WEIGHT_BPS,
     SOLVER_CUT_BPS, TAKE_PROFIT_PCT, TAKE_PROFIT_PPM, WHALE_DUMP_HOURS,
@@ -197,6 +197,33 @@ fn key_results(w: &mut String, p: &Params, out: &SimOut) {
         bps(SOLVER_CUT_BPS.0 as u128),
         bps(SOLVER_CUT_BPS.1 as u128)
     );
+    {
+        let meme = scenario(out, "meme-basket");
+        let (m0, m1) = (&meme.days[0], last_day(meme));
+        let (sd1, ss1) = (last_day(steady), &steady.days[0]);
+        let spread = |d: &DayOut| d.floor_usd.p90 / d.floor_usd.p10.max(1e-30);
+        let _ = writeln!(
+            w,
+            "- **NEAR memes basket:** a $COOK-style coin backed by three memecoins, with weekly votes on a \
+             one-third seat. In basket units the floor goes from {} to {} ({}), the same mechanics as any \
+             other basket. In dollars it is a meme: with the basket swinging {}% a day, the day-{DAYS} floor \
+             runs from ${} to ${} per 1M tokens across runs (p10 to p90, {:.1}x), against ${} to ${} \
+             ({:.2}x) for a 3% basket of majors. The floor protects your share of the basket, not the \
+             basket's price; {} winning votes per run swapped a seat.",
+            per_million(m0.floor_bu.median),
+            per_million(m1.floor_bu.median),
+            pct_change(m0.floor_bu.median, m1.floor_bu.median),
+            MEME_BASKET_DAILY_VOL_PPM / 10_000,
+            per_million(m1.floor_usd.p10),
+            per_million(m1.floor_usd.p90),
+            spread(m1),
+            per_million(sd1.floor_usd.p10),
+            per_million(sd1.floor_usd.p90),
+            spread(sd1),
+            meme.stats.swaps_per_run.median
+        );
+        let _ = ss1;
+    }
     if let (Some(min), Some(burn)) = (st.epoch_min_challenge_pct_of_supply, st.epoch_burn_pct_of_supply) {
         let _ = writeln!(
             w,
@@ -339,7 +366,7 @@ fn assumptions(w: &mut String, p: &Params, out: &SimOut) {
     let _ = writeln!(w, "- All model arithmetic is integer; the files are byte-identical on any machine.\n");
     let _ = writeln!(w, "**Value of a BU**");
     let _ = writeln!(w, "- 1 BU = ${} at launch (`launch.bu_usd_default` in `constants.json`; a real coin picks its own at launch), so graduation ({} BU of reserve) means about ${} raised. Agents act in BU, so this value only scales the USD columns.", whole_units(p.bu_usd_e18), thousands(whole_units(p.curve.grad_reserve)), thousands(whole_units(p.curve.grad_reserve) * whole_units(p.bu_usd_e18)));
-    let _ = writeln!(w, "- The basket's USD value follows a random walk with {}% daily volatility and no drift (an integer approximation of a normal draw). It moves only the USD columns in `sim.json`; agents trade in BU and do not react to it.\n", ppm_pct(BASKET_DAILY_VOL_PPM as u32));
+    let _ = writeln!(w, "- The basket's USD value follows a random walk with {}% daily volatility ({}% for the NEAR memes basket) and no drift (an integer approximation of a normal draw). It moves only the USD columns in `sim.json`; agents trade in BU and do not react to it.\n", ppm_pct(BASKET_DAILY_VOL_PPM as u32), ppm_pct(MEME_BASKET_DAILY_VOL_PPM as u32));
     let _ = writeln!(w, "**Agents**");
     let _ = writeln!(w, "- Fair-launch window: every launch deposit pays its fee, the nets are pooled into one curve buy, and the tokens are split pro rata.");
     let _ = writeln!(w, "- Retail buyers arrive at random (60 one-minute slots per hour, each a buyer with probability rate / 1,440). Ticket sizes in BU: {}; mean {mean}.", sizes.join(", "));
@@ -349,7 +376,7 @@ fn assumptions(w: &mut String, p: &Params, out: &SimOut) {
     let _ = writeln!(w, "- Whales (pump and dump) join the fair launch with {} to {} BU each and sell everything in {} hourly chunks, starting at a random hour between day {} and day {}.", thousands(pump.agents.whale_bu[0] as f64), thousands(pump.agents.whale_bu[1] as f64), WHALE_DUMP_HOURS, pump.agents.whale_dump_days[0], pump.agents.whale_dump_days[1]);
     let _ = writeln!(w, "- Fees owed to the creator and the protocol are claimed at the end of each day.\n");
     let _ = writeln!(w, "**Rituals (challenge war)**");
-    let _ = writeln!(w, "- The basket is one anchored asset and one {} seat; challengers always target the seat.", bps(SEAT_WEIGHT_BPS));
+    let _ = writeln!(w, "- The basket is one anchored asset and one {} seat (three assets with {} seats in the NEAR memes basket); challengers always target a seat.", bps(SEAT_WEIGHT_BPS), bps(MEME_SEAT_WEIGHT_BPS));
     let _ = writeln!(w, "- Each {epoch_days}-day epoch the challengers aim for {}% to {}% of the challenge minimum as it stands at the epoch's start. They turn that into tokens at the current burn value, clamp it to {} to {} of circulating supply, and burn it in {} or {} equal parts at random hours (none in the epoch's last {CHALLENGE_QUIET_HOURS} hours).", CHALLENGE_MARGIN_PCT.0, CHALLENGE_MARGIN_PCT.1, bps(CHALLENGE_BUDGET_BPS.0), bps(CHALLENGE_BUDGET_BPS.1), CHALLENGE_PARTS.0, CHALLENGE_PARTS.1);
     let _ = writeln!(w, "- Defenders answer each challenge burn with probability {}%, {} to {} hours later, burning {}% to {}% of its size.", ppm_pct(DEFEND_PPM), DEFEND_DELAY_HOURS.0, DEFEND_DELAY_HOURS.1, DEFEND_SIZE_PCT.0, DEFEND_SIZE_PCT.1);
     let _ = writeln!(w, "- All burns in an epoch are capped at {} of supply at the epoch's start, first come first served: once the cap is reached, later burns that epoch, from either side, are cut. The biggest bag on each side burns, out of the early holders' bags.", bps(EPOCH_BURN_CAP_BPS));

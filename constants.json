@@ -1,0 +1,190 @@
+{
+  "app": {
+    "codename": "backed"
+  },
+  "units": {
+    "token_decimals": 18,
+    "bu_decimals": 18,
+    "bps": 10000,
+    "price_scale_e": 36
+  },
+  "curve": {
+    "virtual_bu": "5000",
+    "virtual_tokens": "1073000000",
+    "graduation_reserve_bu": "20000"
+  },
+  "fees": {
+    "trade_fee_bps": {
+      "min": 25,
+      "max": 100,
+      "default": 100
+    },
+    "split_bps": {
+      "creator": 5000,
+      "vault": 3000,
+      "protocol": 2000
+    },
+    "redeem_fee_bps": 50
+  },
+  "launch": {
+    "basket_assets": {
+      "min": 1,
+      "max": 9
+    },
+    "fair_launch_window_s": {
+      "prod": 600,
+      "demo": 120
+    },
+    "bu_usd_default": 1,
+    "queue_cap_bu": "18000",
+    "min_queue_bu": "1"
+  },
+  "epochs": {
+    "len_s": {
+      "prod": 604800,
+      "demo": 600
+    }
+  },
+  "challenge": {
+    "min_burn_bps_of_slot": 300,
+    "max_open_per_epoch": 32
+  },
+  "prices": {
+    "staleness_s": {
+      "prod": 3600,
+      "demo": 600
+    }
+  },
+  "auction": {
+    "start_premium_bps": 2000,
+    "len_s": {
+      "prod": 3600,
+      "demo": 120
+    }
+  },
+  "graduation": {
+    "pool_share_bps": 2000
+  },
+  "log": {
+    "ring_size": 100
+  },
+  "bot": {
+    "max_trade_usd": 50,
+    "max_day_usd": 200,
+    "poll_s": 30,
+    "new_wallet_near": "0.5"
+  },
+  "swapper": {
+    "fee_bps": 30
+  },
+  "testnet_tokens": [
+    {
+      "symbol": "USDC",
+      "token_id": "nep141:usdc.mock",
+      "decimals": 6,
+      "usd": 1
+    },
+    {
+      "symbol": "BTC",
+      "token_id": "nep141:btc.mock",
+      "decimals": 8,
+      "usd": 100000
+    },
+    {
+      "symbol": "ETH",
+      "token_id": "nep141:eth.mock",
+      "decimals": 18,
+      "usd": 3500
+    },
+    {
+      "symbol": "SOL",
+      "token_id": "nep141:sol.mock",
+      "decimals": 9,
+      "usd": 180
+    },
+    {
+      "symbol": "PEPE",
+      "token_id": "nep141:pepe.mock",
+      "decimals": 18,
+      "usd": 1e-05
+    },
+    {
+      "symbol": "DOGE",
+      "token_id": "nep141:doge.mock",
+      "decimals": 8,
+      "usd": 0.2
+    },
+    {
+      "symbol": "WIF",
+      "token_id": "nep141:wif.mock",
+      "decimals": 6,
+      "usd": 1.5
+    },
+    {
+      "symbol": "BONK",
+      "token_id": "nep141:bonk.mock",
+      "decimals": 5,
+      "usd": 2e-05
+    },
+    {
+      "symbol": "NVDA",
+      "token_id": "nep141:nvda.mock",
+      "decimals": 18,
+      "usd": 180
+    },
+    {
+      "symbol": "BLACKDRAGON",
+      "token_id": "nep141:blackdragon.mock",
+      "decimals": 18,
+      "usd": 5.6e-09
+    },
+    {
+      "symbol": "SHITZU",
+      "token_id": "nep141:shitzu.mock",
+      "decimals": 18,
+      "usd": 0.00135
+    },
+    {
+      "symbol": "JAMBO",
+      "token_id": "nep141:jambo.mock",
+      "decimals": 18,
+      "usd": 0.000178
+    },
+    {
+      "symbol": "SHIB",
+      "token_id": "nep141:shib.mock",
+      "decimals": 18,
+      "usd": 4.15e-06
+    },
+    {
+      "symbol": "TRUMP",
+      "token_id": "nep141:trump.mock",
+      "decimals": 6,
+      "usd": 1.06
+    },
+    {
+      "symbol": "KAITO",
+      "token_id": "nep141:kaito.mock",
+      "decimals": 18,
+      "usd": 0.1976
+    },
+    {
+      "symbol": "VVV",
+      "token_id": "nep141:vvv.mock",
+      "decimals": 18,
+      "usd": 18.2
+    },
+    {
+      "symbol": "PUBLIC",
+      "token_id": "nep141:public.mock",
+      "decimals": 18,
+      "usd": 0.00317
+    },
+    {
+      "symbol": "ITLX",
+      "token_id": "nep141:itlx.mock",
+      "decimals": 18,
+      "usd": 0.000467
+    }
+  ]
+}

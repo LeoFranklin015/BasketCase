@@ -1,0 +1,50 @@
+# Backed (working name)
+
+> A memecoin launchpad on NEAR where every coin holds a basket of assets in its own vault and the contract computes a floor from that vault. Fees and burns raise the floor. Holders burn tokens to challenge or defend basket assets; a winning challenge swaps the asset through a Dutch auction. At 20,000 basket units the coin graduates into a built-in pool and every token becomes redeemable for a share of the vault. NEAR HACKATHON entry (November 2026), Memecoins With Mechanics track.
+
+Status: runs on NEAR testnet only. Testnet uses stand-in contracts for NEAR Intents (`intents.backedlab.testnet`) and 1Click (`swapper.backedlab.testnet`), and stand-in tokens (`nep141:*.mock`). Nothing is deployed on mainnet. The mainnet swap path (1Click, NEP-413 signed intents) is written and unit-tested but has not moved real funds.
+
+Hosted (testnet): https://fortune-literacy-counter-exceed.trycloudflare.com
+Hosted (same code built for mainnet, not deployed there yet): https://therapeutic-amend-antibodies-midwest.trycloudflare.com
+Fallback (testnet, self-signed certificate): https://141.148.209.77:3000
+Try it: open /c/degen-0.pad.backedlab.testnet → Connect → Guest wallet (gas + 100 test USDC arrive by themselves) → Buy.
+
+## Pages
+
+- `/`: what the product is
+- `/app`: every coin with price, floor and backed share, plus a live trade feed
+- `/c/<coin-account>`: one coin: floor, basket, chart, buy and sell, challenge and defend, holders, voted-out assets
+- `/launch`: launch a coin
+- `/graveyard`: every asset voted out of a basket
+- `/sim`: 60-day simulation results
+- `/widget/<coin-account>`: compact coin card; may be framed by any site
+- `/x/<coin-account>`: the X player card for a coin link; only x.com / twitter.com may frame it, and it buys and sells in place (testnet guest wallet)
+
+## API (read-only)
+
+- `GET /api/status`: JSON with `network`, `factory`, `verifier`, `checked_at`, and per coin `id`, `ticker`, `stage`, `price`, `floor` (BU per token), `price_usd`, `floor_usd`, `vault_bu`, `supply`, `backed_pct`, `floor_matches_formula`, `access_keys`, `basket`. Cached 30 seconds.
+- `GET /api/history/<coin-account>`: trades rebuilt from the coin's NEP-297 events, with the floor history
+- `POST /api/rpc`: proxy for NEAR view calls on this app's contracts only
+- `GET /api/og/<coin-account>`: link-card image
+
+## Contracts (NEAR testnet)
+
+- Factory: `pad.backedlab.testnet` (`list_coins {from, limit}`)
+- Coins: `degen-0.pad.backedlab.testnet`, `trench-0.pad.backedlab.testnet`, `chips-0.pad.backedlab.testnet`, `demo1283-0.pad.backedlab.testnet` (graduated)
+- Coin views: `get_config`, `get_state`, `get_basket`, `get_tombstones {from, limit}`, `get_log` (last 100 mints and burns)
+- Coin accounts have zero access keys. The factory account has one key, held by the team.
+- Floor (BU per token): before graduation, 5000/1073000000 + surplus/sold; after graduation, reserve/supply.
+
+## How to verify
+
+- Source: README.md in the repository; `pnpm verify` runs every offline check, `pnpm verify --live` adds read-only on-chain checks.
+- Zero keys: `view_access_key_list` on any coin account returns `"keys": []` (RPC: https://rpc.testnet.fastnear.com).
+- Floor: `get_state.floor` equals the formula above on the same `get_state`; `/api/status` reports this as `floor_matches_formula`.
+- Code structure and every flow, with a testnet transaction link per action: ARCHITECTURE.md.
+- Mainnet: MetaMask (USDC on Base) and Phantom (USDC on Solana) buys and sells through the buyer's own NEAR Intents account; signatures checked read-only against mainnet with `pnpm --filter scripts intents:check`. Not yet run with real funds.
+
+## Disclosures
+
+- Most testnet trades come from the team's own accounts (`trader1`–`trader3`, `alice`, `bob`, `keeper` under `backedlab.testnet`).
+- Prices come from one reporter account run by the team and only set auction starting rates.
+- Much of the code was written with AI coding agents.

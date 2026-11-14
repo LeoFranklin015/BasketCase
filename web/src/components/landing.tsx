@@ -5,7 +5,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { backedByLabel, backing } from "@/lib/backing";
-import { BRAND, EXPLORER_ACCOUNT, NET, RHEA_POOLS, deployment, rheaPoolUrl } from "@/lib/config";
+import { BRAND, DIRECT_COINS, EXPLORER_ACCOUNT, NET, RHEA_POOLS, deployment, rheaPoolUrl } from "@/lib/config";
+
+/**
+ * Mainnet's demo coin is deployed directly, without the factory, and keeps one access key so it can be deleted
+ * (and its storage NEAR recovered) after judging. Factory-launched coins (testnet) have no keys at all.
+ */
+const DIRECT = deployment.factory === "none";
 import { getReader, loadSummary } from "@/lib/data";
 import { useNow, usePoll } from "@/lib/hooks";
 import { sparkPoints, type Trade } from "@/lib/history";
@@ -159,8 +165,8 @@ export function Landing() {
             <Link href="/app" className="hover:text-ink">
               Markets
             </Link>
-            <a href={EXPLORER_ACCOUNT(deployment.factory)} target="_blank" rel="noreferrer" className="hover:text-ink">
-              Factory on NEARBlocks
+            <a href={EXPLORER_ACCOUNT(DIRECT ? (DIRECT_COINS[0]?.account_id ?? "") : deployment.factory)} target="_blank" rel="noreferrer" className="hover:text-ink">
+              {DIRECT ? "Coin on NEARBlocks" : "Factory on NEARBlocks"}
             </a>
             <a href="/api/status" target="_blank" rel="noreferrer" className="hover:text-ink">
               /api/status
@@ -223,8 +229,8 @@ function Hero({ live, error, state, coins, coin, onPick }: { live: Live | undefi
                 <span className="text-muted">Sell any time for at least the floor</span>
               </li>
               <li className="flex items-baseline gap-2">
-                <span className="num font-semibold text-ink">0</span>
-                <span className="text-muted">keys: nobody can take the basket</span>
+                <span className="num font-semibold text-ink">{DIRECT ? 1 : 0}</span>
+                <span className="text-muted">{DIRECT ? "key, kept only to delete this demo coin after judging" : "keys: nobody can take the basket"}</span>
               </li>
             </ul>
           ) : (
@@ -271,8 +277,8 @@ function HeroCtas({ coin }: { coin: LiveCoin | null }) {
       {GUEST_ENABLED ? (
         <TryFreeButton className="btn-lg" onDone={() => router.push(coin ? `/c/${coin.id}` : "/app")} />
       ) : (
-        <Link href="/launch" className="btn btn-ink btn-lg">
-          Launch a coin
+        <Link href={DIRECT ? (coin ? `/c/${coin.id}` : "/app") : "/launch"} className="btn btn-ink btn-lg">
+          {DIRECT ? (coin ? `Buy $${coin.ticker}` : "See the coin") : "Launch a coin"}
         </Link>
       )}
       <Link href="/app" className="btn btn-quiet btn-lg">
@@ -716,8 +722,9 @@ function WhyDifferent({ coin }: { coin: LiveCoin | null }) {
               </div>
             }
           >
-            Memecoin treasuries usually sit with someone who can move them. Here each coin is its own NEAR contract with no access keys and no owner methods; the floor is
-            computed on-chain from what the vault holds, and holders fight over the basket each round.
+            Memecoin treasuries usually sit with someone who can move them. Here each coin is its own NEAR contract with no owner methods
+            {DIRECT ? " (factory-launched coins have no access keys; this mainnet demo coin keeps one only so it can be deleted after judging)" : " and no access keys"}; the floor
+            is computed on-chain from what the vault holds, and holders fight over the basket each round.
           </DiffRow>
         </ol>
       </div>

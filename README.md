@@ -25,13 +25,38 @@
 ## How Basketcase solves it
 
 - **Every coin holds a basket.** The creator picks 1–9 real assets from any chain NEAR Intents holds (BTC, ETH, SOL, NVIDIA via Ondo, NEAR memes like BLACKDRAGON…). Buying a coin buys the basket, and it sits in the coin's own vault.
-- **A floor the contract computes.** A line like "every token is backed by $1.30" (the illustrative figure in our images) is arithmetic on the coin's own state, never a price feed. 30% of every fee goes to the vault, so the floor only rises. (The floor is the least a sell pays, before the fee; not a guarantee.)
+- **A floor the contract computes.** A line like "every token is backed by $1.30" (the illustrative figure in our images) is arithmetic on the coin's own state, never a price feed. 30% of every fee goes to the vault, so fees push the floor up. (The floor is the least a sell pays, before the fee; not a guarantee.)
 - **Holders run the basket.** Each round, holders burn tokens to vote an asset out; a Dutch auction swaps in the replacement.
 - **Memecoin today, index tomorrow.** At 20,000 basket units the coin graduates into an index fund and is listed on Rhea (NEAR's DEX) automatically.
 - **Buy from any chain.** Pay with USDC on Base (MetaMask) or Solana (Phantom): one transfer, then you sign messages. No bridge, no new wallet, no NEAR gas, and the coins land under your own wallet's address.
 - **Buy inside your X feed.** A coin's link unfurls into a live card in the post: buy in one tap, sell in one more.
 
-<p align="center"><img src="docs/media/tokenomics.png" alt="Tokenomics" width="100%"></p>
+## Tokenomics
+
+<p align="center"><img src="docs/media/tokenomics.png" alt="How a coin works: fair launch, trade on a bonding curve, holders vote on the basket, graduate into an index listed on Rhea. A $10 buy puts $9.90 of real assets in the vault; the $0.10 fee splits 5¢ creator, 3¢ vault, 2¢ protocol. The floor is the least a sell pays, and fees push it up." width="100%"></p>
+
+<details>
+<summary><b>Tokenomics in numbers</b> (every value, with where it comes from)</summary>
+
+| Parameter | Value | Source |
+|---|---|---|
+| Basket | 1–9 assets, any token NEAR Intents holds; weights set at launch | `constants.json` `launch.basket_assets` |
+| Basket unit (BU) | one fixed amount of each asset; worth $1 at launch | `launch.bu_usd_default` |
+| Fair launch | 10 min (testnet demo: 2 min); queued buys all mint at one average price; cap 18,000 BU, minimum 1 BU | `launch.fair_launch_window_s`, `queue_cap_bu`, `min_queue_bu` |
+| Bonding curve | constant product on virtual reserves of 5,000 BU and 1,073,000,000 tokens (the Pump.fun shape) | `curve.virtual_bu`, `curve.virtual_tokens` |
+| Trading fee | 1% by default; a creator can set 0.25–1% | `fees.trade_fee_bps` |
+| Fee split | 50% creator, 30% vault (raises the floor), 20% protocol | `fees.split_bps` |
+| Floor before graduation | `x0/y0 + surplus/sold` in BU per token: the curve's lowest price plus the vault surplus per sold token | `crates/curve-math`, `get_state` |
+| Floor after graduation | `reserve/supply` | `crates/curve-math`, `get_state` |
+| Voting round | 7 days (testnet demo: 10 min) | `epochs.len_s` |
+| Challenge rule | burn tokens to challenge or defend an asset; the biggest challenge wins if it beats the defense and burned at least 3% of the asset's share of the vault; at most 32 open per round; burns are never refunded | `challenge.min_burn_bps_of_slot`, `max_open_per_epoch` |
+| Swap auction | Dutch auction from 20% above the fair rate down to it (never below), over 1 hour (demo: 2 min); partial fills allowed | `auction.start_premium_bps`, `auction.len_s` |
+| Graduation | at 20,000 BU in the curve: minting stops, 20% of the backing seeds a built-in pool, and the keeper lists the coin on Rhea | `curve.graduation_reserve_bu`, `graduation.pool_share_bps`, `scripts/src/keeper.ts` |
+| After graduation | a sell pays the better of the pool price or redeeming a share of the vault; 0.5% of a redeem stays in the vault | `fees.redeem_fee_bps` |
+| Prices | only set an auction's starting rate; buy, sell, redeem and the floor never read a price | `AGENTS.md` invariants |
+
+The floor is the least a sell pays before the fee. Its dollar value moves with the basket's assets, and it is not a guarantee.
+</details>
 
 ## Why it's different
 

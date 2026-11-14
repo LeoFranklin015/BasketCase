@@ -102,6 +102,13 @@ Two earlier testnet coins graduated and were listed the same way: $AI ([pool #29
 - Testnet app: https://basketcase-testnet.vercel.app
 - Mainnet app: https://basketcase-near.vercel.app
 
+## Launch your own coin
+
+Each coin is its own NEAR contract, so launching one needs NEAR for the contract's storage (NEAR charges about 1 NEAR per 100 KB).
+
+- **Testnet:** open **Launch** in the app, pick the basket and the weights, and launch. It takes a **5 test-NEAR** deposit; test NEAR is free from the [testnet faucet](https://near-faucet.io/).
+- **Mainnet:** there is no Launch button yet (no mainnet factory). A coin is deployed with `scripts/src/mainnet-coin.ts`, as $DEGEN was: about **3.84 NEAR** of storage plus a few cents of gas. That NEAR isn't spent: a directly deployed coin returns it when it is deleted (`scripts/src/mainnet-cleanup.ts`). A factory-launched coin has no keys, so its storage stays locked for good.
+
 ## Live on NEAR mainnet
 
 $DEGEN (50% BTC, 50% USDC) is deployed at [`degen.basketcase.near`](https://nearblocks.io/address/degen.basketcase.near).

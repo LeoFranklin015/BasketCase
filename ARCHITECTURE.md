@@ -6,11 +6,37 @@ How Basketcase works on **NEAR mainnet**, and what is swapped for a stand-in on 
 
 ```mermaid
 flowchart LR
-  W["Your wallet<br/>MetaMask · Phantom · NEAR"] --> A["Basketcase app"]
-  A --> I["NEAR Intents<br/>holds all balances"]
-  I <--> C["Coin contract"]
-  O["1Click"] --> I
-  W --> O
+  subgraph Wallets["Buyer's own wallet"]
+    MM["MetaMask<br/>USDC on Base"]
+    PH["Phantom<br/>USDC on Solana"]
+    NW["NEAR wallet"]
+  end
+
+  subgraph App["Web app (Next.js, Vercel)"]
+    UI["Pages + X card<br/>web/src"]
+    API["/api/xbuy<br/>builds messages, tracks orders"]
+    DB[("MongoDB<br/>order status")]
+  end
+
+  subgraph NEAR["NEAR mainnet"]
+    COIN["Coin contract<br/>degen.basketcase.near"]
+    INT["NEAR Intents<br/>intents.near<br/>holds every balance"]
+    REL["Relayer<br/>router.basketcase.near<br/>pays gas only"]
+    RHEA["Rhea DEX"]
+  end
+
+  OC["1Click<br/>cross-chain swaps"]
+
+  MM -- "1 USDC transfer" --> OC
+  PH -- "1 USDC transfer" --> OC
+  OC -- "USDC into the buyer's<br/>own Intents account" --> INT
+  MM & PH -. "sign messages" .-> UI
+  UI --> API --> DB
+  API -- "signed swaps" --> OC
+  API -- "signed buy / sell" --> REL -- "execute_intents" --> INT
+  INT <-- "basket in, coins out" --> COIN
+  COIN -. "after graduation" .-> RHEA
+  NW --> COIN
 ```
 
 - **Coin contract** (`contracts/coin`, math in `crates/curve-math`). One contract per coin. It holds its basket inside NEAR Intents, prices the coin on a bonding curve, computes the floor, runs the holder vote and the swap auction, and graduates into an index. It never reads a price for buys, sells or the floor.
@@ -22,9 +48,17 @@ flowchart LR
 ## A coin's life
 
 ```mermaid
-flowchart LR
-  L["Fair launch"] --> T["Trading"] --> V["Holder vote"] --> X["Index"] --> R["Rhea"]
-  V --> T
+stateDiagram-v2
+  [*] --> FairLaunch: create
+  FairLaunch --> Curve: window ends, everyone gets one average price
+  Curve --> Curve: buy / sell on the bonding curve
+  Curve --> Vote: each round
+  Vote --> Auction: a challenge wins
+  Auction --> Curve: new asset in, old one to the graveyard
+  Vote --> Curve: defended
+  Curve --> Index: 20,000 basket units in the curve
+  Index --> Index: sell = better of pool or redeem
+  Index --> Rhea: keeper lists it
 ```
 
 - **Basket.** 1–9 assets, any token NEAR Intents holds. A buy sends the whole basket into the coin's vault.
@@ -35,8 +69,29 @@ flowchart LR
 ## Buying from Base or Solana
 
 ```mermaid
-flowchart LR
-  P["Pay USDC<br/>on Base or Solana"] --> O["1Click"] --> I["Your NEAR Intents<br/>account"] --> S["You sign<br/>the buy"] --> C["Coins land<br/>in your account"]
+sequenceDiagram
+  autonumber
+  actor U as Buyer (MetaMask / Phantom)
+  participant W as Web app + /api/xbuy
+  participant O as 1Click
+  participant I as NEAR Intents
+  participant R as Relayer
+  participant C as Coin
+
+  U->>W: Buy $1 of $DEGEN
+  W->>O: quote: USDC on Base → buyer's Intents account
+  W->>U: deposit address (checked with 1Click by the browser)
+  U->>O: one USDC transfer on Base
+  O->>I: USDC lands in the buyer's own account
+  W->>U: swap messages + the buy message
+  Note over U,W: the browser checks each message<br/>(signer, receivers, caps, 1Click quote) before the wallet signs
+  U->>W: signatures
+  W->>O: signed swaps
+  O->>I: basket assets into the buyer's account
+  W->>R: signed buy
+  R->>I: execute_intents
+  I->>C: basket transfer with "buy, deliver"
+  C->>I: mint coins to the buyer's account
 ```
 
 **Sell and cash out** run the same way in reverse: the buyer signs a withdrawal of their coins to the coin with a sell message (the coin pays the basket back into their account; a sell that can't fill returns the coins), then signs 1Click swaps that send USDC to their wallet on Base or Solana.
@@ -62,9 +117,25 @@ The full product runs on NEAR testnet with the same coin contract and web app. N
 
 ```mermaid
 flowchart LR
-  A["intents.near"] -. testnet .-> A2["mock-intents"]
-  B["1Click"] -. testnet .-> B2["mock-swapper"]
-  C["Real tokens"] -. testnet .-> C2["Test tokens"]
+  subgraph Mainnet
+    A["intents.near"]
+    B["1Click"]
+    C["Real tokens<br/>BTC, ETH, SOL, NVDAon, memes"]
+    D["MetaMask / Phantom<br/>pay with USDC"]
+    E["One coin deployed directly<br/>(keeps a key for cleanup)"]
+  end
+  subgraph Testnet
+    A2["contracts/mock-intents<br/>intents.backedlab.testnet<br/>+ a test-token faucet"]
+    B2["contracts/mock-swapper<br/>fills any size at posted prices"]
+    C2["*.mock test tokens"]
+    D2["Guest wallet or email (Privy)<br/>with free test USDC"]
+    E2["contracts/factory<br/>coins with no access keys"]
+  end
+  A -. "stand-in" .-> A2
+  B -. "stand-in" .-> B2
+  C -. "stand-in" .-> C2
+  D -. "stand-in" .-> D2
+  E -. "differs" .-> E2
 ```
 
 Also on testnet only: short timings (2-minute fair launch, 10-minute voting rounds and 2-minute auctions instead of 10 minutes, 7 days and 1 hour), the keeper service closing rounds and listing on Rhea's testnet deployment, and trades from our own test accounts, labelled as test traders.

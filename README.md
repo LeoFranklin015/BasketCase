@@ -56,7 +56,7 @@
 
 **Try it** (no wallet needed on testnet: a guest wallet with test tokens is made for you):
 - Testnet app: https://fortune-literacy-counter-exceed.trycloudflare.com
-- Mainnet app: https://therapeutic-amend-antibodies-midwest.trycloudflare.com
+- Mainnet app: https://basketcase-near.vercel.app
 
 ## Live on NEAR mainnet
 
@@ -75,7 +75,7 @@ Checks anyone can rerun, all read-only:
 ```bash
 pnpm install
 pnpm --filter scripts intents:check     # mainnet NEAR Intents accepts MetaMask and Phantom signatures: 8 PASS
-SITE=<mainnet app> pnpm --filter scripts mainnet:dryrun degen.basketcase.near   # 5 PASS, no money moves
+SITE=https://basketcase-near.vercel.app pnpm --filter scripts mainnet:dryrun degen.basketcase.near   # 5 PASS, no money moves
 pnpm verify                             # every offline check: Rust, simulator, unit, typecheck, browser: all PASS
 ```
 

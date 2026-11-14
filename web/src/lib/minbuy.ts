@@ -10,8 +10,11 @@ export const MIN_LEG_USD: Record<string, number> = {
   "nep141:bnb-0xa9ee28c80f960b889dfbd1902055218cba016f75.omdep.near": 6.5, // NVDAon
   "nep141:nbtc.bridge.near": 0.25, // BTC: fills from $0.10
 };
-/** No buy below $1: the Base/Solana deposit fills from $0.50, and this leaves room for its fee. */
-export const MIN_BUY_USD = 1;
+/** No buy below $0.50: the Base/Solana deposit fills from $0.50 (and cash-outs from $0.10). */
+export const MIN_BUY_USD = 0.5;
+
+/** $0.5 → "0.50", $7 → "7". */
+export const fmtMin = (usd: number): string => (Number.isInteger(usd) ? String(usd) : usd.toFixed(2));
 export const DEFAULT_LEG_USD = 1.15;
 const PAY_TOKEN = "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1"; // USDC: no swap needed
 
@@ -24,13 +27,14 @@ export function minBuyUsd(rows: { token_id: string; share: number | null }[], ne
     if (share <= 0 || r.token_id === PAY_TOKEN) continue;
     min = Math.max(min, (MIN_LEG_USD[r.token_id] ?? DEFAULT_LEG_USD) / share);
   }
-  return Math.ceil(min);
+  // Round up to the next 10 cents (float-safe).
+  return Math.ceil(Math.round(min * 1000) / 100) / 10;
 }
 
 /** The plain-words reason shown under a buy that is too small. */
 export function minBuyMessage(ticker: string, min: number, rows: { token_id: string; symbol: string; share: number | null }[]): string {
   const limiting = rows.find((r) => (MIN_LEG_USD[r.token_id] ?? 0) / (r.share || 1) >= min - 1);
   return limiting
-    ? `Smallest buy for $${ticker} is $${min}: ${limiting.symbol} needs at least $${MIN_LEG_USD[limiting.token_id]!.toFixed(2)} per swap.`
-    : `Smallest buy for $${ticker} is $${min}.`;
+    ? `Smallest buy for $${ticker} is $${fmtMin(min)}: ${limiting.symbol} needs at least $${MIN_LEG_USD[limiting.token_id]!.toFixed(2)} per swap.`
+    : `Smallest buy for $${ticker} is $${fmtMin(min)}.`;
 }

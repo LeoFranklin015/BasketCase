@@ -35,7 +35,7 @@ import {
 import { KeyPair, type KeyPairString } from "near-api-js";
 import { deployment, tokenInfo } from "../config";
 import { getReader } from "../data";
-import { minBuyUsd } from "../minbuy";
+import { fmtMin, minBuyUsd } from "../minbuy";
 import { basketRows, buUsdE6, rawToUsd } from "../money";
 import { sendWithRawSigner } from "../near-signer";
 import { failoverFetch, rpcProvider } from "../rpc";
@@ -50,7 +50,7 @@ export const USDC_ON: Record<XChain, { asset: string; contract: string; decimals
   solana: { asset: "nep141:sol-5ce3bf3a31af18be40ba30f721101b4341690186.omft.near", contract: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", decimals: 6 },
 };
 export const NEAR_USDC = "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1";
-export const MIN_USD = 1;
+export const MIN_USD = 0.5;
 export const MAX_USD = 25;
 const STANDARD: Record<XChain, "erc191" | "raw_ed25519"> = { base: "erc191", solana: "raw_ed25519" };
 
@@ -278,7 +278,7 @@ export async function start(input: { coin: string; chain: XChain; user: string; 
   if (!(await reader.getCoin(input.coin))) throw new Error("Unknown coin.");
   const [basket, prices] = await Promise.all([reader.coin(input.coin).getBasket(), reader.swapper.getPrices()]);
   const min = minBuyUsd(basketRows(basket, Object.fromEntries(prices)), "mainnet");
-  if (input.usd < min) throw new Error(`Smallest buy for this coin is $${min}.`);
+  if (input.usd < min) throw new Error(`Smallest buy for this coin is $${fmtMin(min)}.`);
   const usdc = USDC_ON[input.chain];
   const amountIn = BigInt(Math.round(input.usd * 10 ** usdc.decimals)).toString();
   const q = await oneClick<{ quote?: { depositAddress?: string } }>("/v0/quote", {
@@ -658,9 +658,9 @@ export async function assetsInIntents(coin: string, intentsId: string): Promise<
   const [basket, prices] = await Promise.all([reader.coin(coin).getBasket(), reader.swapper.getPrices()]);
   const usd = Object.fromEntries(prices);
   const ids = Array.from(new Set([NEAR_USDC, ...basket.map((b) => b.token_id)]));
-  // Only amounts 1Click will take: cash-outs to Base fill from $0.25 per asset (dry quotes, Nov 14, 2026). Smaller
+  // Only amounts 1Click will take: cash-outs to Base fill from $0.10 per asset (dry quotes, Nov 14, 2026). Smaller
   // dust stays in NEAR Intents and isn't offered.
-  return Object.fromEntries(Object.entries(await held(intentsId, ids)).filter(([t, a]) => BigInt(a) > 0n && (rawToUsd(t, a, usd) ?? 0) >= 0.25));
+  return Object.fromEntries(Object.entries(await held(intentsId, ids)).filter(([t, a]) => BigInt(a) > 0n && (rawToUsd(t, a, usd) ?? 0) >= 0.1));
 }
 
 /** What the browser sees. */

@@ -20,7 +20,7 @@ import { ChainIcon, TokenIcon, WalletIcon } from "./token-icon";
 import { CoinProvider, useCoin, useCoinSnapshot, useHistoryFeed, useMarket, useNumbers } from "./coin/context";
 import { useTx } from "./tx";
 import { XChainBuy } from "./coin/xchain-buy";
-import { minBuyUsd } from "@/lib/minbuy";
+import { fmtMin, minBuyUsd } from "@/lib/minbuy";
 import { isOndoStock } from "@/lib/icons";
 
 // The card loads its own face so it never depends on what the site layout loads.
@@ -344,7 +344,7 @@ function Card() {
               disabled={busy}
               onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, "").slice(0, 7))}
             />
-            <span className="xc-get">{pay > 0 && pay < minUsd ? `min $${minUsd}` : tokensFor > 0 ? `≈ ${fmt(tokensFor)}` : pay > MAX_USD ? `max $${MAX_USD}` : ""}</span>
+            <span className="xc-get">{pay > 0 && pay < minUsd ? `min $${fmtMin(minUsd)}` : tokensFor > 0 ? `≈ ${fmt(tokensFor)}` : pay > MAX_USD ? `max $${MAX_USD}` : ""}</span>
           </label>
           <button type="submit" className="xc-btn" disabled={busy || !amountOk} data-testid="x-buy" aria-live="polite">
             {busy ? <span className="xc-busy">{status ?? "Working…"}</span> : <><BuyIcon />Buy</>}

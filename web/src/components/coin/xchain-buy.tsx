@@ -7,6 +7,7 @@
 import { NEAR_USDC_ASSET, ONECLICK_URL, USDC_ASSET, checkOneClickDeposit, checkPayloads, intentsIdFor, sentTo, type SignedIntent } from "@backed/client";
 import { useEffect, useRef, useState } from "react";
 import { EXPLORER_TX, deployment } from "@/lib/config";
+import { fmtMin } from "@/lib/minbuy";
 import { connectMetaMask, connectPhantom, hasMetaMask, hasPhantom, sendUsdcOnBase, sendUsdcOnSolana, signWithMetaMask, signWithPhantom } from "@/lib/xwallets";
 import { ChainIcon, WalletIcon } from "../token-icon";
 
@@ -221,7 +222,7 @@ export function XChainBuy({ coin, ticker, usd, minUsd = 0, className }: { coin: 
         <div className="grid gap-2.5">
           <PayButton onClick={() => void pay("base")} disabled={!!busy || !(usd > 0) || below} wallet="metamask" chain="base" label={busy === "base" ? "Confirm in MetaMask…" : `MetaMask · $${usd || 0} USDC on Base`} missing={!wallets.mm} />
           <PayButton onClick={() => void pay("solana")} disabled={!!busy || !(usd > 0) || below} wallet="phantom" chain="solana" label={busy === "solana" ? "Confirm in Phantom…" : `Phantom · $${usd || 0} USDC on Solana`} missing={!wallets.ph} />
-          {below && <p className="text-sm font-semibold text-[#E5484D]">Smallest buy here is ${minUsd}.</p>}
+          {below && <p className="text-sm font-semibold text-[#E5484D]">Smallest buy here is ${fmtMin(minUsd)}.</p>}
           <p className="text-xs leading-snug text-[color:var(--muted,#6E6E73)]">
             One USDC transfer into NEAR Intents under your own wallet&apos;s address, then you sign the swaps and the buy as messages. Your wallet
             controls the funds at every step; our account only pays NEAR gas.

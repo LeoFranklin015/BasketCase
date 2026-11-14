@@ -145,7 +145,7 @@ NEAR smart contracts in Rust (`near-sdk`) · NEAR Intents (multi-chain vault, si
 
 ## Brand
 
-Logo files (PNG, transparent): [mark 1024 px](web/public/brand/basketcase-mark-1024.png) · [mark 512 px](web/public/brand/basketcase-mark-512.png) · [mark 256 px](web/public/brand/basketcase-mark-256.png) · [logo](web/public/brand/basketcase-logo.png) · [logo on dark](web/public/brand/basketcase-logo-dark.png) · dark mark: [1024 px transparent](web/public/brand/basketcase-mark-dark-1024.png), [512 px transparent](web/public/brand/basketcase-mark-dark-512.png), [1024 px on dark](web/public/brand/basketcase-mark-dark-square-1024.png) · [SVG](web/public/brand/basketcase-mark.svg). Also served by the app at `/brand/…`.
+Logo files (PNG, transparent): [mark 1024 px](web/public/brand/basketcase-mark-1024.png) · [mark 512 px](web/public/brand/basketcase-mark-512.png) · [mark 256 px](web/public/brand/basketcase-mark-256.png) · [logo](web/public/brand/basketcase-logo.png) · [logo on dark](web/public/brand/basketcase-logo-dark.png) · dark mark: [1024 px transparent](web/public/brand/basketcase-mark-dark-1024.png), [512 px transparent](web/public/brand/basketcase-mark-dark-512.png), [1024 px on dark](web/public/brand/basketcase-mark-dark-square-1024.png) · X profile picture (1000 px, circle-safe): [yellow](web/public/brand/basketcase-x-avatar-yellow.png), [dark](web/public/brand/basketcase-x-avatar-dark.png), [light](web/public/brand/basketcase-x-avatar-light.png) · [SVG](web/public/brand/basketcase-mark.svg). Also served by the app at `/brand/…`.
 
 ## Go deeper
 

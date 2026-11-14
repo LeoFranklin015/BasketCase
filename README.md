@@ -8,8 +8,8 @@
 </p>
 
 <p align="center">
-  <a href="docs/media/basketcase-product.mp4"><img src="docs/media/video-poster.png" alt="Watch the 60-second product demo" width="85%"></a>
-  <br><sub>▶ Click to watch the 60-second product demo, narrated (<code>docs/media/basketcase-product.mp4</code>)</sub>
+  <a href="docs/media/basketcase-product.mp4"><img src="docs/media/video-poster.png" alt="Watch the product demo" width="85%"></a>
+  <br><sub>▶ Click to watch the product demo (72 s, narrated) (<code>docs/media/basketcase-product.mp4</code>)</sub>
 </p>
 
 ---

@@ -225,6 +225,19 @@ export function XChainBuy({
     }
   };
 
+  // Opened from the X card for a wallet (?pay=…): start the payment right away, so the extension's popup opens
+  // without a second tap. Once per page load, and only when that wallet is installed in this browser.
+  const autoPaid = useRef(false);
+  useEffect(() => {
+    if (!suggest || framed || autoPaid.current || order || busy) return;
+    const installed = suggest === "base" ? wallets.mm : wallets.ph;
+    if (!installed || !(usd > 0) || below) return;
+    autoPaid.current = true;
+    void pay(suggest);
+    // pay reads the latest render's values; this only fires when the page is ready to pay
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [suggest, framed, wallets.mm, wallets.ph, usd, below]);
+
   const startAction = async (action: "sell" | "cashout", chain?: Chain) => {
     setErr(undefined);
     signing.current = null;
@@ -287,7 +300,13 @@ export function XChainBuy({
             highlight={suggest === "solana"}
           />
           {framed && <p className="text-xs text-[#6E6E73]">Opens Basketcase in a new tab, where your wallet can sign.</p>}
-          {suggest && !framed && <p className="text-sm font-semibold">Tap the highlighted button to pay ${usd || 0} from your wallet.</p>}
+          {suggest && !framed && (
+            <p className="text-sm font-semibold">
+              {(suggest === "base" ? wallets.mm : wallets.ph)
+                ? `Approve the $${usd || 0} payment in ${suggest === "base" ? "MetaMask" : "Phantom"}. If its window didn't open, tap the highlighted button.`
+                : `Tap the highlighted button to pay $${usd || 0} from your wallet.`}
+            </p>
+          )}
           {below && <p className="text-sm font-semibold text-[#E5484D]">Smallest buy here is ${fmtMin(minUsd)}.</p>}
           <p className="text-xs leading-snug text-[color:var(--muted,#6E6E73)]">
             One USDC transfer into NEAR Intents under your own wallet&apos;s address, then you sign the swaps and the buy as messages. Your wallet

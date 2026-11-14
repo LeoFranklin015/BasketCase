@@ -84,8 +84,10 @@ async function loadLive(): Promise<Live> {
   const tombs = await Promise.all(ok.map((s) => r.coin(s.info.account_id).getTombstones(0, 100).then((t) => t.length).catch(() => null)));
   const graves = tombs.every((t) => t === null) ? null : tombs.reduce<number>((a, t) => a + (t ?? 0), 0);
   const symbols = [...new Set(coins.flatMap((c) => c.rows.filter((row) => row.known).map((row) => row.symbol)))];
-  return { coins: coins
-      .filter((c) => c.mcapUsd > 0)
+  // Coins nobody has bought yet (market cap 0) stay off the showcase, unless no coin has trades yet (a new
+  // network, like mainnet's first coin): then show what exists rather than an empty hero.
+  const traded = coins.filter((c) => c.mcapUsd > 0);
+  return { coins: (traded.length ? traded : coins)
       // Lead with the showcase coins (assets everyone knows: NVIDIA, ETH, SOL, BTC), then live curves before graduated
       // coins, then by size. The DEMO coins are our own walkthrough coins, so they go last.
       .sort(
@@ -730,8 +732,9 @@ function WhyDifferent({ coin }: { coin: LiveCoin | null }) {
 function OnX({ coin }: { coin: LiveCoin | null }) {
   const [origin, setOrigin] = useState("");
   useEffect(() => setOrigin(window.location.origin), []);
-  const id = coin?.id ?? "gpu-0.pad.backedlab.testnet";
-  const ticker = coin?.ticker ?? "GPU";
+  // The showcase coin; only testnet has a fixed fallback coin to show before the list loads.
+  const id = coin?.id ?? (NET.testTokens ? "gpu-0.pad.backedlab.testnet" : "");
+  const ticker = coin?.ticker ?? (NET.testTokens ? "GPU" : "");
   const page = `${origin}/c/${encodeURIComponent(id)}`;
   const post = `$${ticker} has a floor: every token is backed by a basket of real assets on NEAR. ${page}`;
   return (
@@ -764,7 +767,7 @@ function OnX({ coin }: { coin: LiveCoin | null }) {
           </figcaption>
           <p className="mt-3 px-1 text-[15px] leading-snug">${ticker} has a floor. Every token is backed by a basket of real assets.</p>
           <div className="mt-3 overflow-hidden rounded-[18px] border border-line">
-            {origin ? (
+            {origin && id ? (
               <iframe src={`/x/${encodeURIComponent(id)}`} title={`$${ticker} card, as it appears in a post on X`} className="block aspect-square w-full border-0" loading="lazy" />
             ) : (
               <Skeleton className="aspect-square w-full rounded-none" />

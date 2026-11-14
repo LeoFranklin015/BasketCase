@@ -13,9 +13,9 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
-      - name: Unit and property tests (curve math, coin, factory, mocks, simulator)
+      - name: "Unit and property tests (curve math, coin, factory, mocks, simulator)"
         run: cargo test --workspace --release
-      - name: Simulator output matches the committed files
+      - name: "Simulator output matches the committed files"
         run: cargo run -p sim --release -- --check
 
   wasm:
@@ -26,7 +26,7 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
-      - name: Build contracts (coin first: the factory embeds it)
+      - name: "Build contracts (coin first: the factory embeds it)"
         run: ./scripts/build-contracts.sh
 
   node:

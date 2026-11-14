@@ -21,6 +21,16 @@ const P0 = CURVE.float.x0 / CURVE.float.y0; // opening price, BU per token
 
 let nextKey = 3;
 
+/** Words for a random demo coin: a meme name and a ticker made from it. */
+const RANDOM_NAMES = ["Moon Bag", "Giga Chad", "Wagmi", "Lambo Fund", "Fomo", "Hodl", "Ape Index", "Diamond Hands", "Bonkers", "Degen Club", "Copium", "Based", "Rocket", "Frog Bank", "Doge Vault", "Meme Index"];
+const pick = <T,>(xs: readonly T[]): T => xs[Math.floor(Math.random() * xs.length)]!;
+/** Split 100% into `n` weights in steps of 5, each at least 10. */
+function randomWeights(n: number): number[] {
+  const w = Array<number>(n).fill(10);
+  for (let left = 100 - 10 * n; left > 0; left -= 5) w[Math.floor(Math.random() * n)]! += 5;
+  return w.sort((a, b) => b - a);
+}
+
 /** How the asset picker groups the basket tokens. Anything else lands in "Other". */
 const ASSET_GROUPS = [
   { id: "majors", label: "Majors", symbols: ["BTC", "ETH", "SOL", "NEAR", "WNEAR", "USDC", "USDT"] },
@@ -74,6 +84,23 @@ export function LaunchForm() {
   const openUsd = (P0 * buUsdE6) / 1e6;
   const openUnit = priceUnit(openUsd);
   const update = (key: number, patch: Partial<AssetRow>) => setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+
+  /** Fill the form with a random demo coin: a meme name, one anchored major and 2 or 3 assets from other groups,
+   *  only tokens the swapper can price (so the basket is valid as filled). */
+  const randomize = () => {
+    const priced = deployment.tokens.filter((t) => priceMap[t.token_id]);
+    const majors = priced.filter((t) => ["BTC", "ETH", "SOL"].includes(t.symbol));
+    const others = priced.filter((t) => !majors.includes(t) && t.token_id !== PAY_TOKEN_ID);
+    if (!majors.length || others.length < 2) return;
+    const shuffled = [...others].sort(() => Math.random() - 0.5).slice(0, 2 + Math.floor(Math.random() * 2));
+    const chosen = [pick(majors), ...shuffled];
+    const weights = randomWeights(chosen.length);
+    const nm = pick(RANDOM_NAMES);
+    const base = nm.replace(/[^A-Za-z]/g, "").toUpperCase().slice(0, 6);
+    setName(nm);
+    setTicker(`${base}${Math.floor(10 + Math.random() * 90)}`);
+    setRows(chosen.map((t, i) => ({ key: nextKey++, token_id: t.token_id, custom: false, weight: String(weights[i]), anchored: i === 0, usd: "", decimals: "" })));
+  };
 
   // Price per raw unit (1e36) for each row: the swapper's, or the one typed for a custom token.
   const computed = rows.map((r) => {
@@ -167,6 +194,19 @@ export function LaunchForm() {
     >
       <div className="min-w-0 space-y-5">
         <Step n={1} title="Name it" caption="This is what people see in the list and on the coin page.">
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <button type="button" className="btn btn-ink btn-sm" onClick={randomize} disabled={prices.loading && !prices.data} data-testid="random-coin">
+              <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden className="shrink-0">
+                <rect x="2.5" y="2.5" width="15" height="15" rx="4" fill="none" stroke="currentColor" strokeWidth="1.8" />
+                <circle cx="7" cy="7" r="1.4" fill="currentColor" />
+                <circle cx="13" cy="13" r="1.4" fill="currentColor" />
+                <circle cx="13" cy="7" r="1.4" fill="currentColor" />
+                <circle cx="7" cy="13" r="1.4" fill="currentColor" />
+              </svg>
+              Random coin
+            </button>
+            <span className="caption text-xs">Fills a name, a basket from different chains and weights. Change anything after.</span>
+          </div>
           <div className="grid gap-4 sm:grid-cols-[12rem_1fr]">
             <label className="block">
               <span className="text-sm font-semibold">Ticker</span>

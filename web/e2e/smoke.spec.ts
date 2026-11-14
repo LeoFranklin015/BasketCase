@@ -136,6 +136,19 @@ test("widget, launch, graveyard and simulation render", async ({ page }) => {
   await expect(page.getByTestId("price-chart")).toBeVisible();
   await page.goto("/launch");
   await expect(page.getByRole("heading", { name: "Launch a coin" })).toBeVisible();
+  // Random coin fills a valid demo coin: a ticker, a name, 3 or 4 assets that add up to 100%.
+  await expect(page.getByTestId("random-coin")).toBeEnabled();
+  await page.getByTestId("random-coin").click();
+  await expect(page.getByPlaceholder("DEGEN", { exact: true })).toHaveValue(/^[A-Z]{2,6}\d{2}$/);
+  await expect(page.getByPlaceholder("Degen", { exact: true })).not.toHaveValue("");
+  const weights = page.getByRole("textbox", { name: /weight in percent/ });
+  await expect(weights).toHaveCount(await weights.count());
+  const n = await weights.count();
+  expect(n).toBeGreaterThanOrEqual(3);
+  expect(n).toBeLessThanOrEqual(4);
+  let total = 0;
+  for (let i = 0; i < n; i++) total += Number(await weights.nth(i).inputValue());
+  expect(total).toBe(100);
   await page.goto("/graveyard");
   await expect(page.getByTestId("tombstones")).toBeVisible();
   await page.goto("/sim");

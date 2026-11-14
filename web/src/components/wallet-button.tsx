@@ -3,6 +3,8 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { EXPLORER_ACCOUNT, NET, PRIVY_LOGIN_LABEL } from "@/lib/config";
 import { GUEST_ENABLED, useWallet, type WalletMethod } from "@/lib/wallet";
+import { useXWallet, type XChain } from "@/lib/xwallet";
+import { hasMetaMask, hasPhantom } from "@/lib/xwallets";
 import { Avatar } from "./coin-bits";
 import { cx, shortAccount } from "./ui";
 import { WalletIcon, type WalletKind } from "./token-icon";
@@ -34,6 +36,7 @@ const MENU = "absolute right-0 top-full z-40 mt-2 w-80 rounded-[var(--radius)] b
 /** `solid` keeps the ink fill even where "Try it free" is offered (pages without that button, like Launch). */
 export function WalletButton({ compact, wide, solid }: { compact?: boolean; wide?: boolean; solid?: boolean }) {
   const { accountId, method, ready, privy, funding, connect, disconnect } = useWallet();
+  const { xwallet, connectX, disconnectX } = useXWallet();
   const [err, setErr] = useState<string>();
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
@@ -45,6 +48,47 @@ export function WalletButton({ compact, wide, solid }: { compact?: boolean; wide
     setOpen(false);
     connect(m).catch((e: Error) => setErr(e.message));
   };
+  const pickX = (chain: XChain) => {
+    setErr(undefined);
+    setOpen(false);
+    connectX(chain).catch((e: Error) => setErr(/reject|denied|cancel/i.test(e.message) ? "Cancelled in the wallet." : e.message));
+  };
+  const crossChain = NET.swapRoute === "oneclick";
+
+  if (!accountId && xwallet) {
+    const kind = xwallet.chain === "base" ? "metamask" : "phantom";
+    return (
+      <span ref={ref} className="relative inline-flex flex-col items-end">
+        <button type="button" className="btn btn-quiet btn-sm max-w-[13rem] gap-2 pl-1.5" title={xwallet.user} aria-expanded={open} aria-controls={menuId} onClick={() => setOpen((o) => !o)}>
+          <WalletIcon kind={kind} size={24} />
+          <span className="truncate">{shortAccount(xwallet.user, compact ? 12 : 14)}</span>
+          <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-up" />
+        </button>
+        {open && (
+          <div id={menuId} className={MENU}>
+            <div className="flex gap-3 px-3 py-2.5">
+              <WalletIcon kind={kind} size={40} className="shrink-0 self-start" />
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-muted">{xwallet.chain === "base" ? "MetaMask · USDC on Base" : "Phantom · USDC on Solana"}</p>
+                <p className="mono mt-0.5 break-all text-xs">{xwallet.user}</p>
+                <p className="caption mt-1.5 text-xs">Your coins sit in NEAR Intents under this address; only this wallet can move them.</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="w-full rounded-[12px] px-3 py-2.5 text-left text-sm font-semibold hover:bg-sunk"
+              onClick={() => {
+                close();
+                disconnectX();
+              }}
+            >
+              Disconnect
+            </button>
+          </div>
+        )}
+      </span>
+    );
+  }
 
   if (accountId) {
     return (
@@ -103,15 +147,15 @@ export function WalletButton({ compact, wide, solid }: { compact?: boolean; wide
         type="button"
         className={cx("btn", wide ? "btn-lg w-full" : "btn-sm", GUEST_ENABLED && !solid ? "btn-line" : "btn-ink")}
         disabled={!ready || !!status}
-        aria-expanded={privy.enabled || GUEST_ENABLED ? open : undefined}
-        aria-controls={privy.enabled || GUEST_ENABLED ? menuId : undefined}
-        onClick={() => (privy.enabled || GUEST_ENABLED ? setOpen((o) => !o) : pick("near"))}
+        aria-expanded={privy.enabled || GUEST_ENABLED || crossChain ? open : undefined}
+        aria-controls={privy.enabled || GUEST_ENABLED || crossChain ? menuId : undefined}
+        onClick={() => (privy.enabled || GUEST_ENABLED || crossChain ? setOpen((o) => !o) : pick("near"))}
       >
         {status ? "Signing in…" : wide ? "Connect a wallet" : "Connect"}
       </button>
       {open && (
         <div id={menuId} className={cx(MENU, wide && "left-0 right-auto w-full")}>
-          <ConnectOptions onPick={pick} />
+          <ConnectOptions onPick={pick} onPickX={crossChain ? pickX : undefined} />
         </div>
       )}
       {(err || status) && (
@@ -161,10 +205,30 @@ export function TryFreeButton({ className, label = "Try it free", note = true, b
 }
 
 /** The ways in: a NEAR wallet, email/social through Privy, or (testnet) a guest key made in this browser. */
-export function ConnectOptions({ onPick }: { onPick: (m: WalletMethod) => void }) {
+export function ConnectOptions({ onPick, onPickX }: { onPick: (m: WalletMethod) => void; onPickX?: (chain: XChain) => void }) {
   const { privy } = useWallet();
+  const [has, setHas] = useState({ mm: false, ph: false });
+  useEffect(() => setHas({ mm: hasMetaMask(), ph: hasPhantom() }), []);
   return (
     <div className="space-y-1">
+      {onPickX && (
+        <>
+          <MenuOption
+            icon="metamask"
+            title="MetaMask · Base"
+            note={has.mm ? "Pay with USDC on Base. Your coins stay under your own address." : "Not found in this browser: install MetaMask first."}
+            disabled={!has.mm}
+            onClick={() => onPickX("base")}
+          />
+          <MenuOption
+            icon="phantom"
+            title="Phantom · Solana"
+            note={has.ph ? "Pay with USDC on Solana. Your coins stay under your own address." : "Not found in this browser: install Phantom first."}
+            disabled={!has.ph}
+            onClick={() => onPickX("solana")}
+          />
+        </>
+      )}
       <MenuOption icon="near" title="NEAR wallet" note="Use a NEAR wallet you already have." onClick={() => onPick("near")} />
       {privy.enabled && (
         <MenuOption

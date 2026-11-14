@@ -8,6 +8,7 @@ import { NEAR_USDC_ASSET, ONECLICK_URL, USDC_ASSET, checkOneClickDeposit, checkP
 import { useEffect, useRef, useState } from "react";
 import { EXPLORER_TX, deployment } from "@/lib/config";
 import { fmtMin } from "@/lib/minbuy";
+import { useXWallet } from "@/lib/xwallet";
 import { connectMetaMask, connectPhantom, hasMetaMask, hasPhantom, sendUsdcOnBase, sendUsdcOnSolana, signWithMetaMask, signWithPhantom } from "@/lib/xwallets";
 import { ChainIcon, WalletIcon } from "../token-icon";
 
@@ -49,7 +50,7 @@ export function XChainBuy({ coin, ticker, usd, minUsd = 0, className }: { coin: 
   const [err, setErr] = useState<string>();
   const [order, setOrder] = useState<Order | null>(null);
   const orderId = order?.id;
-  const [wallet, setWallet] = useState<{ chain: Chain; user: string } | null>(null);
+  const { xwallet: wallet, connectX } = useXWallet();
   const [holding, setHolding] = useState<string | null>(null);
   const [assets, setAssets] = useState<Record<string, string>>({});
   const [sentTx, setSentTx] = useState<{ chain: Chain; hash: string } | null>(null);
@@ -59,6 +60,11 @@ export function XChainBuy({ coin, ticker, usd, minUsd = 0, className }: { coin: 
   const signing = useRef<string | null>(null);
   const [wallets, setWallets] = useState({ mm: false, ph: false });
   useEffect(() => setWallets({ mm: hasMetaMask(), ph: hasPhantom() }), []);
+  // A connected wallet (header or here): show what it holds right away.
+  useEffect(() => {
+    if (wallet) void refreshHolding(wallet);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wallet?.chain, wallet?.user]);
   // A new order: start its clock and bring its progress into view (the pay buttons sit low on the page).
   useEffect(() => {
     if (!orderId) return setStartedAt(null);
@@ -67,12 +73,8 @@ export function XChainBuy({ coin, ticker, usd, minUsd = 0, className }: { coin: 
   }, [orderId]);
   useEffect(() => () => void (timer.current && clearInterval(timer.current)), []);
 
-  const connect = async (chain: Chain) => {
-    const user = chain === "base" ? await connectMetaMask() : await connectPhantom();
-    const w = { chain, user };
-    setWallet(w);
-    return w;
-  };
+  /** The header's wallet when it is on this chain; otherwise ask this chain's wallet to connect. */
+  const connect = async (chain: Chain) => (wallet?.chain === chain ? wallet : connectX(chain));
 
   const refreshHolding = async (w: { chain: Chain; user: string }) => {
     try {

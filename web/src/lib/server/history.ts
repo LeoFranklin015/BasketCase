@@ -10,7 +10,7 @@
  */
 
 import { NET } from "../network";
-import { DATA_MODE, deployment } from "../config";
+import { DATA_MODE, deployment, DIRECT_COINS } from "../config";
 import { getReader } from "../data";
 import { RPC_URLS } from "../rpc";
 import { FIXTURE_COINS } from "../fixture/world";
@@ -342,5 +342,6 @@ function fixtureHistory(coin: string): CoinHistory {
 export function isOurCoin(id: string): boolean {
   if (!/^[a-z0-9][a-z0-9._-]{1,62}[a-z0-9]$/.test(id)) return false;
   if (DATA_MODE === "fixture") return FIXTURE_COINS.some((c) => c.info.account_id === id);
-  return id.endsWith(`.${deployment.factory}`);
+  // Factory coins, plus coins deployed directly (the mainnet demo, deployments/mainnet.json "coins").
+  return id.endsWith(`.${deployment.factory}`) || DIRECT_COINS.some((c) => c.account_id === id);
 }

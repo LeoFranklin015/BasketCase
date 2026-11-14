@@ -5,6 +5,7 @@ import { Inter } from "next/font/google";
 import type { ReactNode } from "react";
 import { BRAND, NET } from "@/lib/config";
 import { WalletProvider } from "@/lib/wallet";
+import { XWalletProvider } from "@/lib/xwallet";
 
 // One face: Inter with its optical-size axis, from captions to the big money numbers.
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap", axes: ["opsz"] });
@@ -31,7 +32,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" data-theme="light" className={inter.variable} suppressHydrationWarning>
       <body className="min-h-dvh">
-        <WalletProvider>{children}</WalletProvider>
+        <WalletProvider>
+          <XWalletProvider>{children}</XWalletProvider>
+        </WalletProvider>
       </body>
     </html>
   );

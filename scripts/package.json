@@ -13,7 +13,8 @@
     "test": "vitest run",
     "mainnet:cost": "tsx src/mainnet-cost.ts",
     "mainnet:check": "tsx src/mainnet-check.ts",
-    "intents:check": "tsx src/intents-check.ts"
+    "intents:check": "tsx src/intents-check.ts",
+    "mainnet:dryrun": "tsx src/mainnet-dryrun.ts"
   },
   "dependencies": {
     "near-api-js": "7.4.0"
@@ -22,6 +23,7 @@
     "@noble/curves": "1.9.7",
     "@noble/hashes": "1.8.0",
     "@types/node": "22.20.5",
+    "near-seed-phrase": "0.2.1",
     "tsx": "4.23.15",
     "typescript": "6.0.3",
     "vitest": "4.1.12"

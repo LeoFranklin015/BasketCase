@@ -80,6 +80,52 @@ impl Coin {
         self.send(&account_id, ids, amts);
     }
 
+    /// After a delivered buy: `ft_on_transfer` returns what NEAR Intents did not take (a failed call took nothing).
+    /// That part moves from the verifier's balance to the buyer's own balance on this coin.
+    #[private]
+    pub fn on_delivered(&mut self, receiver_id: AccountId, amount: U128) {
+        let unused = match env::promise_result_checked(0, 64) {
+            Ok(bytes) => near_sdk::serde_json::from_slice::<U128>(&bytes).map(|u| u.0.min(amount.0)).unwrap_or(amount.0),
+            Err(_) => amount.0,
+        };
+        let verifier = self.cfg.verifier.clone();
+        let unused = unused.min(self.token.ft_balance_of(verifier.clone()).0);
+        if unused == 0 {
+            return;
+        }
+        self.token.internal_withdraw(&verifier, unused);
+        if !self.is_registered(&receiver_id) {
+            self.token.internal_register_account(&receiver_id);
+        }
+        self.token.internal_deposit(&receiver_id, unused);
+        let parked = self.parked.get(&receiver_id).copied().unwrap_or(0);
+        self.parked.insert(receiver_id.clone(), parked + unused);
+        near_contract_standards::fungible_token::events::FtTransfer {
+            old_owner_id: &verifier,
+            new_owner_id: &receiver_id,
+            amount: U128(unused),
+            memo: Some("NEAR Intents did not take a delivered buy; credited to the buyer here"),
+        }
+        .emit();
+    }
+
+    /// Try again to put coins of a delivered buy into NEAR Intents, where the buyer's MetaMask or Phantom signatures
+    /// control them. Only coins `on_delivered` parked (NEAR Intents didn't take them) can move, and only to that same
+    /// account inside NEAR Intents; anyone may call it. Coins bought or received any other way are never touched.
+    pub fn redeliver(&mut self, account_id: AccountId) {
+        let parked = self.parked.get(&account_id).copied().unwrap_or(0);
+        let amount = parked.min(self.token.ft_balance_of(account_id.clone()).0);
+        require!(amount > 0, "nothing parked to deliver");
+        if parked == amount {
+            self.parked.remove(&account_id);
+        } else {
+            self.parked.insert(account_id.clone(), parked - amount);
+        }
+        let verifier = self.cfg.verifier.clone();
+        self.token.internal_transfer(&account_id, &verifier, amount, Some("redeliver to NEAR Intents".into()));
+        self.notify_verifier(&account_id, amount);
+    }
+
     #[private]
     pub fn on_payout(&mut self, receiver_id: AccountId, token_ids: Vec<String>, amounts: Vec<U128>) {
         if env::promise_result_checked(0, 64).is_err() {

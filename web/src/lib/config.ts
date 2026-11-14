@@ -9,10 +9,10 @@ export { NET, NETWORK } from "./network";
 /** Product name lives here only, so it can be swapped in one place. */
 export const BRAND = {
   /** Shown in the header, titles and link cards. */
-  name: "Backed",
+  name: "Basketcase",
   /** Lower-case codename used in storage keys and the NEP-297 standard. */
   codename: constantsJson.app.codename,
-  tagline: "Memecoins with a floor.",
+  tagline: "Buy the meme. Keep the index.",
   /** One sentence used wherever the floor appears. */
   floorSentence: "The floor is the least any sell pays per token before the fee: the curve's lowest price plus the backing each token has gained from fees and burns.",
   /** The same sentence for a graduated (Index mode) coin. */

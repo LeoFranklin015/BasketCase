@@ -30,7 +30,7 @@ const coin = size("coin");
 const plan = process.argv.includes("--factory") ? "factory" : "direct";
 const coinNear = plan === "direct" ? Math.ceil((coin + 25_000) / 1_000) / 100 : (coin + STATE_ALLOWANCE) * BYTE;
 const factoryNear = plan === "factory" ? Math.ceil(factory / 10_000) / 10 + 0.5 : 0;
-const helperNear = plan === "factory" ? 0.45 : 0.3; // direct plan: router.<master>, the relayer that pays gas for signed MetaMask/Phantom intents
+const helperNear = plan === "factory" ? 0.45 : 0.15; // direct plan: router.<master>, the relayer that pays gas for signed MetaMask/Phantom intents
 const gasNear = 0.06; // create + deploy the coin, a buy, a sell, delete: a few mNEAR each, rounded up
 const regNear = 0.01; // the buyer's storage with the coin (NEP-145) and NEAR Intents key registration
 const upfrontNear = factoryNear + coinNear + helperNear + gasNear + regNear;

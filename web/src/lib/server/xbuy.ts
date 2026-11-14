@@ -12,12 +12,12 @@
 //      Our relayer account only pays the gas: it cannot change, redirect or spend what the buyer signed.
 // Selling is one signed `ft_withdraw` of the coin to the coin with a sell message (the basket assets come back
 // to the seller's NEAR Intents account), and cashing out is one signed 1Click swap per asset to USDC on their chain.
-// Orders are kept in a JSON file so a restart doesn't lose them.
+// Orders are kept in MongoDB (MONGODB_URI, for Vercel) or a JSON file on a long-running server; see the store below.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import {
   buyIntent,
-  checkPayload,
+  checkPayloads,
   functionCall,
   intentsIdFor,
   intentsSwapQuote,
@@ -36,7 +36,7 @@ import { KeyPair, type KeyPairString } from "near-api-js";
 import { deployment, tokenInfo } from "../config";
 import { getReader } from "../data";
 import { minBuyUsd } from "../minbuy";
-import { basketRows, buUsdE6 } from "../money";
+import { basketRows, buUsdE6, rawToUsd } from "../money";
 import { sendWithRawSigner } from "../near-signer";
 import { failoverFetch, rpcProvider } from "../rpc";
 
@@ -76,6 +76,15 @@ export type XOrder = {
   rules?: Omit<SigningRules, "latest"> & { latest: string };
   signed?: SignedIntent[];
   sellAmount?: string;
+  /** The coin balance in NEAR Intents just before the buy or sell was relayed, and the relay transaction. */
+  coinBefore?: string;
+  /** The buyer's direct balance on the coin, and their basket balances in NEAR Intents, just before the relay. */
+  directBefore?: string;
+  basketBefore?: Record<string, string>;
+  relayTx?: string;
+  relayAt?: number;
+  /** Consecutive failed polls (network, RPC, 1Click); the order only gives up after many. */
+  attempts?: number;
   tokens?: string;
   txs: string[];
   error?: string;
@@ -84,8 +93,56 @@ export type XOrder = {
 };
 
 // ---------- store ----------
+// Orders live in memory, backed by one of two stores:
+//  - MongoDB (MONGODB_URI, optional MONGODB_DB, default "basketcase"), for serverless hosts such as Vercel, where each
+//    request may run on a different instance with no shared disk; or
+//  - a JSON file (XBUY_STORE, default ~/backed-ops/xbuy-orders.json) on a long-running server.
+// Entry points `hydrate` an order before working on it and `flush` the writes before they return.
 
 const STORE = process.env.XBUY_STORE ?? `${process.env.HOME ?? "/tmp"}/backed-ops/xbuy-orders.json`;
+const MONGO_URI = process.env.MONGODB_URI;
+const DB = !!MONGO_URI;
+const KEEP_DAYS = 14;
+let pending: Promise<unknown>[] = [];
+
+type OrderDoc = { _id: string; order: XOrder; updatedAt: Date };
+// One client per warm instance (Vercel reuses it between requests).
+const g = globalThis as unknown as { __xbuyMongo?: Promise<import("mongodb").Collection<OrderDoc>> };
+function orderCollection(): Promise<import("mongodb").Collection<OrderDoc>> {
+  g.__xbuyMongo ??= (async () => {
+    const { MongoClient } = await import("mongodb");
+    const client = await new MongoClient(MONGO_URI!, { maxPoolSize: 5, serverSelectionTimeoutMS: 8_000 }).connect();
+    const col = client.db(process.env.MONGODB_DB ?? "basketcase").collection<OrderDoc>("xbuy_orders");
+    // Old orders expire on their own.
+    await col.createIndex({ updatedAt: 1 }, { expireAfterSeconds: KEEP_DAYS * 86400 }).catch(() => undefined);
+    return col;
+  })().catch((e) => {
+    g.__xbuyMongo = undefined;
+    throw e;
+  });
+  return g.__xbuyMongo;
+}
+
+/** Pull the latest copy of an order from the shared store (no-op for the file store). */
+async function hydrate(id: string): Promise<void> {
+  if (!DB || !/^[0-9a-f-]{36}$/.test(id)) return;
+  const doc = await (await orderCollection()).findOne({ _id: id });
+  if (doc) load().set(id, doc.order);
+}
+
+/** Wait for this request's writes to reach the shared store. */
+async function flush(): Promise<void> {
+  const p = pending;
+  pending = [];
+  await Promise.all(p);
+}
+
+/** An order, fresh from the store: for routes that read one without moving it. */
+export async function loadOrder(id: string): Promise<XOrder | null> {
+  await hydrate(id);
+  return getOrder(id);
+}
+
 let orders: Map<string, XOrder> | null = null;
 function load(): Map<string, XOrder> {
   if (!orders) {
@@ -101,6 +158,11 @@ function load(): Map<string, XOrder> {
 function save(o: XOrder): XOrder {
   o.updated = Date.now();
   load().set(o.id, o);
+  if (DB) {
+    const doc: OrderDoc = { _id: o.id, order: o, updatedAt: new Date() };
+    pending.push(orderCollection().then((c) => c.replaceOne({ _id: o.id }, doc, { upsert: true })));
+    return o;
+  }
   try {
     mkdirSync(dirname(STORE), { recursive: true });
     writeFileSync(STORE, JSON.stringify([...load().values()].slice(-500), null, 1));
@@ -113,6 +175,12 @@ export function getOrder(id: string): XOrder | null {
   return load().get(id) ?? null;
 }
 const patch = (id: string, p: Partial<XOrder>) => save({ ...getOrder(id)!, ...p });
+/** Save a new order and wait until the store has it. */
+async function persisted(o: XOrder): Promise<XOrder> {
+  save(o);
+  await flush();
+  return o;
+}
 
 // ---------- chain access ----------
 
@@ -139,22 +207,50 @@ async function oneClick<T>(path: string, body?: object): Promise<T> {
   return json;
 }
 
-/** Run signed payloads through `simulate_intents` (a view), then submit them with the relayer. */
+// One relay at a time: each reads the relayer's access-key nonce, so two at once would collide.
+let relayQueue: Promise<unknown> = Promise.resolve();
+
+/** One function call from the relayer (gas only, no deposit), queued behind any other. Returns the transaction id. */
+function relayerSend(contract: string, method: string, args: Record<string, unknown>, tgas: number): Promise<string> {
+  const run = relayQueue.then(async () => {
+    const r = relayerConfig();
+    if (!r) throw new Error("No relayer is configured on this server.");
+    const rpc = await rpcProvider();
+    const out = (await sendWithRawSigner({ rpc, accountId: r.id, publicKey: r.key.getPublicKey(), sign: async (h) => r.key.sign(h).signature }, [
+      { receiverId: contract, actions: [functionCall(method, args, tgas)] },
+    ])) as { transaction_outcome?: { id: string }; status?: { Failure?: unknown } }[];
+    const o = out[0];
+    if (!o || o.status?.Failure) throw new Error(`${method} failed: ${JSON.stringify(o?.status?.Failure ?? "no outcome")}`);
+    return o.transaction_outcome?.id ?? "";
+  });
+  relayQueue = run.catch(() => undefined);
+  return run;
+}
+
+/**
+ * Run signed payloads through `simulate_intents` (a view), then submit them with the relayer. Returns the
+ * transaction id, or "" when NEAR Intents says the payload's nonce is already used (an earlier relay of it landed).
+ */
 async function relay(signed: SignedIntent[]): Promise<string> {
-  const r = relayerConfig();
-  if (!r) throw new Error("No relayer is configured on this server.");
   try {
     await view(deployment.verifier, "simulate_intents", { signed });
   } catch (e) {
-    throw new Error(`NEAR Intents would reject this: ${e instanceof Error ? e.message : String(e)}`);
+    const m = e instanceof Error ? e.message : String(e);
+    if (/nonce.*(used|already)|already.*nonce/i.test(m)) return "";
+    throw new Error(`NEAR Intents would reject this: ${m}`, { cause: "rejected" });
   }
-  const rpc = await rpcProvider();
-  const out = (await sendWithRawSigner({ rpc, accountId: r.id, publicKey: r.key.getPublicKey(), sign: async (h) => r.key.sign(h).signature }, [
-    { receiverId: deployment.verifier, actions: [functionCall("execute_intents", { signed }, 300)] },
-  ])) as { transaction_outcome?: { id: string }; status?: { Failure?: unknown } }[];
-  const o = out[0];
-  if (!o || o.status?.Failure) throw new Error(`execute_intents failed: ${JSON.stringify(o?.status?.Failure ?? "no outcome")}`);
-  return o.transaction_outcome?.id ?? "";
+  return relayerSend(deployment.verifier, "execute_intents", { signed }, 300);
+}
+
+/**
+ * Coins of a delivered buy that NEAR Intents didn't take sit parked under the wallet's own account on the coin;
+ * `redeliver` (anyone may call it) moves them into NEAR Intents. Returns how many are still parked.
+ */
+export async function redeliverParked(coin: string, intentsId: string): Promise<bigint> {
+  const direct = BigInt(await view<string>(coin, "ft_balance_of", { account_id: intentsId }));
+  if (direct === 0n) return 0n;
+  await relayerSend(coin, "redeliver", { account_id: intentsId }, 100).catch(() => undefined);
+  return BigInt(await view<string>(coin, "ft_balance_of", { account_id: intentsId }));
 }
 
 async function nonceFor(deadline: Date): Promise<string> {
@@ -201,7 +297,7 @@ export async function start(input: { coin: string; chain: XChain; user: string; 
     deadline: new Date(Date.now() + 30 * 60_000).toISOString(),
   });
   if (!q.quote?.depositAddress) throw new Error("1Click returned no deposit address.");
-  return save({
+  return persisted({
     id: crypto.randomUUID(),
     kind: "buy",
     coin: input.coin,
@@ -272,7 +368,7 @@ async function prepareBuySigning(o: XOrder) {
     latest: new Date(Date.now() + 3 * 86400_000 + 10 * 60_000).toISOString(),
   };
   // Each swap only spends its own leg; the whole set is checked against the totals.
-  for (const t of toSign) checkPayload(t.payload, { ...rules, latest: new Date(rules.latest) });
+  checkPayloads(toSign.map((t) => t.payload), { ...rules, latest: new Date(rules.latest) });
   patch(o.id, { status: "sign", step: `Sign ${toSign.length} message${toSign.length > 1 ? "s" : ""} in your wallet`, toSign, rules, signed: undefined, error: undefined });
 }
 
@@ -297,8 +393,8 @@ export async function startSell(input: { coin: string; chain: XChain; user: stri
     intents: [sellIntent(input.coin, amount.toString(), minusBps(q.out_bu, 200), intentsId)],
   });
   const rules = { signer: intentsId, verifier: deployment.verifier, receivers: [input.coin], coin: input.coin, maxSpend: { [`nep141:${input.coin}`]: amount.toString() }, latest: new Date(Date.now() + 20 * 60_000).toISOString() };
-  checkPayload(payload, { ...rules, latest: new Date(rules.latest) });
-  return save({
+  checkPayloads([payload], { ...rules, latest: new Date(rules.latest) });
+  return persisted({
     id: crypto.randomUUID(),
     kind: "sell",
     coin: input.coin,
@@ -358,8 +454,8 @@ export async function startCashout(input: { coin: string; chain: XChain; user: s
   }
   if (!toSign.length) throw new Error(skipped.length ? `Too little to cash out (${skipped.join(", ")} stays in NEAR Intents).` : "Nothing to cash out.");
   const rules = { signer: intentsId, verifier: deployment.verifier, receivers: toSign.map((t) => t.depositAddress!), coin: input.coin, maxSpend, latest: new Date(Date.now() + 3 * 86400_000 + 10 * 60_000).toISOString() };
-  for (const t of toSign) checkPayload(t.payload, { ...rules, latest: new Date(rules.latest) });
-  return save({
+  checkPayloads(toSign.map((t) => t.payload), { ...rules, latest: new Date(rules.latest) });
+  return persisted({
     id: crypto.randomUUID(),
     kind: "cashout",
     coin: input.coin,
@@ -380,6 +476,15 @@ export async function startCashout(input: { coin: string; chain: XChain; user: s
 
 /** The wallet's signatures, in the order of `toSign`. Swaps go to 1Click now; the buy or sell waits its turn. */
 export async function submitSignatures(id: string, signed: SignedIntent[]): Promise<XOrder> {
+  await hydrate(id);
+  try {
+    return await submitSignaturesNow(id, signed);
+  } finally {
+    await flush();
+  }
+}
+
+async function submitSignaturesNow(id: string, signed: SignedIntent[]): Promise<XOrder> {
   const o = getOrder(id);
   if (!o) throw new Error("No such order.");
   if (o.status !== "sign" || !o.toSign) throw new Error("This order isn't waiting for signatures.");
@@ -389,11 +494,26 @@ export async function submitSignatures(id: string, signed: SignedIntent[]): Prom
   });
   patch(id, { signed, status: "swapping", step: "Sending your signed swaps", error: undefined });
   const swaps = o.toSign.map((t, i) => [t, signed[i]!] as const).filter(([t]) => t.kind === "swap" || t.kind === "cashout");
+  let accepted = 0;
   try {
-    for (const [, s] of swaps) await oneClick("/v0/submit-intent", { type: "swap_transfer", signedData: s });
+    for (const [, s] of swaps) {
+      await oneClick("/v0/submit-intent", { type: "swap_transfer", signedData: s });
+      accepted++;
+    }
   } catch (e) {
-    // A quote expired while the wallet was open: build fresh ones (nothing moved).
-    patch(id, { status: o.kind === "buy" ? "funded" : "error", step: "Prices moved; preparing fresh messages", error: e instanceof Error ? e.message : String(e) });
+    const why = e instanceof Error ? e.message : String(e);
+    if (accepted === 0 && o.kind === "buy") {
+      // A quote expired while the wallet was open and 1Click took none of them: build fresh ones (nothing moved).
+      patch(id, { status: "funded", step: "Prices moved; preparing fresh messages", error: why });
+    } else {
+      patch(id, {
+        status: "error",
+        error:
+          accepted === 0
+            ? `1Click didn't take the signed messages (${why}). Nothing moved; start again.`
+            : `1Click took ${accepted} of ${swaps.length} swaps and refused the rest (${why}). What it took still fills; everything stays in your own NEAR Intents account. Use Cash out to send it home.`,
+      });
+    }
     return getOrder(id)!;
   }
   patch(id, { status: swaps.length ? "swapping" : "executing", step: swaps.length ? "1Click is filling your swaps" : "Submitting to NEAR Intents" });
@@ -406,6 +526,15 @@ const running = new Set<string>();
 
 /** Move an order forward as far as it can go now; safe to call repeatedly (the page polls it). */
 export async function advance(id: string): Promise<XOrder | null> {
+  await hydrate(id);
+  try {
+    return await advanceNow(id);
+  } finally {
+    await flush();
+  }
+}
+
+async function advanceNow(id: string): Promise<XOrder | null> {
   const o = getOrder(id);
   if (!o || running.has(id)) return o;
   running.add(id);
@@ -430,28 +559,107 @@ export async function advance(id: string): Promise<XOrder | null> {
       if (!states.every((s) => s === "SUCCESS")) return patch(id, { step: `1Click is filling your swaps (${states.filter((s) => s === "SUCCESS").length} of ${states.length})` });
       patch(id, cur.kind === "cashout" ? { status: "done", step: "Done" } : { status: "executing", step: "Submitting to NEAR Intents" });
     }
-    if (getOrder(id)!.status === "executing") {
-      const cur = getOrder(id)!;
-      const i = cur.toSign!.findIndex((t) => t.kind === "buy" || t.kind === "sell");
-      const before = BigInt(await heldInIntents(cur.coin, cur.intentsId));
-      const tx = await relay([cur.signed![i]!]);
-      const after = BigInt(await heldInIntents(cur.coin, cur.intentsId));
-      patch(id, {
-        status: "done",
-        step: "Done",
-        txs: [...cur.txs, tx],
-        tokens: cur.kind === "buy" ? (after - before).toString() : cur.sellAmount,
-      });
-    }
+    if (getOrder(id)!.status === "executing") await execute(id);
+    if (getOrder(id)!.attempts) patch(id, { attempts: 0 });
     return getOrder(id);
   } catch (e) {
     const latest = getOrder(id)!;
-    const keep = latest.status === "awaiting_deposit" || latest.status === "funded";
-    patch(id, { status: keep ? latest.status : "error", error: e instanceof Error ? e.message : String(e) });
-    return getOrder(id);
+    const msg = e instanceof Error ? e.message : String(e);
+    const attempts = (latest.attempts ?? 0) + 1;
+    // NEAR Intents refusing the payload is final; anything else (RPC, 1Click, network) is retried on the next poll.
+    const final = (e instanceof Error && e.cause === "rejected") || attempts >= 15;
+    if (!final || latest.status === "awaiting_deposit") return patch(id, { attempts, step: `${(latest.step ?? "Working").replace(/ \(retrying.*$/, "")} (retrying: ${msg.slice(0, 120)})` });
+    return patch(id, {
+      status: "error",
+      attempts,
+      error: `${msg}. Nothing of yours is lost: whatever arrived is in your own NEAR Intents account; use Cash out to send it back to your wallet.`,
+    });
   } finally {
     running.delete(id);
   }
+}
+
+/**
+ * Relay the signed buy or sell once, then confirm from balances what the coin did: a fill (coins or basket assets
+ * arrive) or a refusal (what was sent comes back). NEAR Intents debits the sender as soon as the relay runs, so a
+ * drop in what was sent proves nothing on its own.
+ */
+async function execute(id: string) {
+  const cur = getOrder(id)!;
+  const i = cur.toSign!.findIndex((t) => t.kind === "buy" || t.kind === "sell");
+  const basketIds = (await getReader().coin(cur.coin).getBasket()).map((b) => b.token_id);
+  const ids = Array.from(new Set([NEAR_USDC, ...basketIds]));
+  if (cur.relayTx === undefined) {
+    if (cur.coinBefore === undefined) {
+      const [coinBefore, directBefore, basketBefore] = await Promise.all([
+        heldInIntents(cur.coin, cur.intentsId),
+        view<string>(cur.coin, "ft_balance_of", { account_id: cur.intentsId }),
+        held(cur.intentsId, ids),
+      ]);
+      patch(id, { coinBefore, directBefore, basketBefore });
+    }
+    const tx = await relay([cur.signed![i]!]);
+    patch(id, { relayTx: tx, relayAt: Date.now(), txs: tx ? [...cur.txs, tx] : cur.txs, step: "Waiting for the coin to fill it" });
+  }
+  const o = getOrder(id)!;
+  const [after, direct, basket] = await Promise.all([
+    heldInIntents(o.coin, o.intentsId).then(BigInt),
+    view<string>(o.coin, "ft_balance_of", { account_id: o.intentsId }).then(BigInt),
+    held(o.intentsId, ids),
+  ]);
+  const coinBefore = BigInt(o.coinBefore ?? "0");
+  const directBefore = BigInt(o.directBefore ?? "0");
+  const before = o.basketBefore ?? {};
+  const grew = (t: string) => BigInt(basket[t] ?? "0") > BigInt(before[t] ?? "0");
+  const backToBefore = (t: string) => BigInt(basket[t] ?? "0") >= BigInt(before[t] ?? "0");
+  const late = Date.now() - (o.relayAt ?? Date.now()) > 4 * 60_000;
+  if (o.kind === "buy") {
+    // Done only when the coins are where the wallet controls them: inside NEAR Intents.
+    if (after > coinBefore && direct <= directBefore) return void patch(id, { status: "done", step: "Done", tokens: (after - coinBefore).toString() });
+    if (direct > directBefore) {
+      // NEAR Intents didn't take the delivery, so the coin parked them under the buyer's own account: deliver again.
+      const left = await redeliverParked(o.coin, o.intentsId);
+      if (left <= directBefore) return void patch(id, { status: "done", step: "Done", tokens: (BigInt(await heldInIntents(o.coin, o.intentsId)) - coinBefore).toString() });
+      if (late) {
+        return void patch(id, {
+          status: "error",
+          error: `Bought, but NEAR Intents hasn't accepted the coins yet. They are held for you on the coin under your own address (${o.intentsId.slice(0, 10)}…), and anyone can retry the delivery with the coin's redeliver method; this page retries each time you check your balance.`,
+        });
+      }
+      return void patch(id, { step: "Bought; delivering the coins to your NEAR Intents account" });
+    }
+    const sent = Object.keys(JSON.parse(o.toSign![i]!.payload).intents[0].tokens as Record<string, string>);
+    if (sent.every(backToBefore)) {
+      return void patch(id, {
+        status: "error",
+        error: "The coin turned the buy down (the price moved past your limit), so nothing was bought. The basket is back in your NEAR Intents account; use Cash out to send it to your wallet.",
+      });
+    }
+  } else {
+    if (basketIds.some(grew)) return void patch(id, { status: "done", step: "Done", tokens: o.sellAmount });
+    // A payout the coin couldn't make is recorded in its `owed` map; withdraw_owed (anyone may call it) retries it.
+    const owed = await view<unknown[]>(o.coin, "get_owed", { account_id: o.intentsId }).catch(() => []);
+    if (Array.isArray(owed) && owed.length) await relayerSend(o.coin, "withdraw_owed", { account_id: o.intentsId }, 150).catch(() => undefined);
+    if (after >= coinBefore) {
+      return void patch(id, { status: "error", error: "The coin turned the sell down (the price moved past your limit). Your coins are back in your NEAR Intents account; try the sell again." });
+    }
+  }
+  if (late) {
+    patch(id, {
+      status: "error",
+      error: "We couldn't confirm the result within 4 minutes. Check your balances below in a minute; nothing can leave your NEAR Intents account without your signature.",
+    });
+  }
+}
+
+/** Everything the wallet holds in NEAR Intents that a cash-out can send home: USDC and the coin's basket assets. */
+export async function assetsInIntents(coin: string, intentsId: string): Promise<Record<string, string>> {
+  const reader = getReader();
+  const [basket, prices] = await Promise.all([reader.coin(coin).getBasket(), reader.swapper.getPrices()]);
+  const usd = Object.fromEntries(prices);
+  const ids = Array.from(new Set([NEAR_USDC, ...basket.map((b) => b.token_id)]));
+  // Only amounts 1Click will take (about $1 and up); dust stays and isn't offered.
+  return Object.fromEntries(Object.entries(await held(intentsId, ids)).filter(([t, a]) => BigInt(a) > 0n && (rawToUsd(t, a, usd) ?? 0) >= 1));
 }
 
 /** What the browser sees. */

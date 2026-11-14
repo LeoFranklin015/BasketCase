@@ -33,7 +33,8 @@ describe("testnet / mainnet switch (NEXT_PUBLIC_NETWORK)", () => {
     expect(c.NET.testTokens).toBe(false);
     expect(c.NET.swapRoute).toBe("oneclick");
     expect(c.EXPLORER_ACCOUNT("x.near")).toBe("https://nearblocks.io/address/x.near");
-    // Until the factory is deployed (needs the owner's go), the app shows "not live on mainnet yet".
-    expect(c.NOT_DEPLOYED).toBe(true);
+    // Mainnet runs one coin deployed directly (no factory): the app lists it instead of "not live yet".
+    expect(c.NOT_DEPLOYED).toBe(false);
+    expect(c.DIRECT_COINS.map((x) => x.account_id)).toContain("degen.basketcase.near");
   });
 });

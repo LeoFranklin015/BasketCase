@@ -1,11 +1,11 @@
 {
   "network": "mainnet",
   "rpc": "https://rpc.mainnet.fastnear.com",
-  "factory": "PLACEHOLDER-not-deployed-on-mainnet-yet",
+  "factory": "none",
   "verifier": "intents.near",
   "swapper": "1click",
-  "reporter": "PLACEHOLDER-reporter",
-  "protocol": "PLACEHOLDER-protocol",
+  "reporter": "basketcase.near",
+  "protocol": "basketcase.near",
   "tokens": [
     {
       "symbol": "USDC",
@@ -111,6 +111,15 @@
       "symbol": "NVDAon",
       "token_id": "nep141:bnb-0xa9ee28c80f960b889dfbd1902055218cba016f75.omdep.near",
       "decimals": 18
+    }
+  ],
+  "coins": [
+    {
+      "account_id": "degen.basketcase.near",
+      "ticker": "DEGEN",
+      "name": "Degen",
+      "creator": "basketcase.near",
+      "created_ms": 1794672719524
     }
   ]
 }

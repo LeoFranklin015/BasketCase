@@ -4,14 +4,14 @@
 // wallet signs the swaps and the buy as messages, and the coin mints into that same account. Selling is one more
 // signed message, and cashing out swaps the basket back to USDC on the wallet's chain (src/lib/server/xbuy.ts).
 // Every message is checked here, against limits the wallet can see, before the wallet is asked to sign it.
-import { checkPayload, intentsIdFor, type SignedIntent } from "@backed/client";
+import { NEAR_USDC_ASSET, ONECLICK_URL, USDC_ASSET, checkOneClickDeposit, checkPayloads, intentsIdFor, sentTo, type SignedIntent } from "@backed/client";
 import { useEffect, useRef, useState } from "react";
 import { EXPLORER_TX, deployment } from "@/lib/config";
 import { connectMetaMask, connectPhantom, hasMetaMask, hasPhantom, sendUsdcOnBase, sendUsdcOnSolana, signWithMetaMask, signWithPhantom } from "@/lib/xwallets";
 import { ChainIcon, WalletIcon } from "../token-icon";
 
 type Chain = "base" | "solana";
-type ToSign = { kind: string; payload: string; label: string };
+type ToSign = { kind: string; payload: string; label: string; depositAddress?: string };
 type Rules = { signer: string; verifier: string; receivers: string[]; coin: string; maxSpend: Record<string, string>; latest: string };
 type Order = {
   id: string;
@@ -49,6 +49,7 @@ export function XChainBuy({ coin, ticker, usd, minUsd = 0, className }: { coin: 
   const [order, setOrder] = useState<Order | null>(null);
   const [wallet, setWallet] = useState<{ chain: Chain; user: string } | null>(null);
   const [holding, setHolding] = useState<string | null>(null);
+  const [assets, setAssets] = useState<Record<string, string>>({});
   const [sentTx, setSentTx] = useState<{ chain: Chain; hash: string } | null>(null);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   const signing = useRef<string | null>(null);
@@ -65,34 +66,62 @@ export function XChainBuy({ coin, ticker, usd, minUsd = 0, className }: { coin: 
 
   const refreshHolding = async (w: { chain: Chain; user: string }) => {
     try {
-      const r = (await (await fetch(`/api/xbuy?coin=${encodeURIComponent(coin)}&chain=${w.chain}&user=${encodeURIComponent(w.user)}`)).json()) as { held?: string };
+      const r = (await (await fetch(`/api/xbuy?coin=${encodeURIComponent(coin)}&chain=${w.chain}&user=${encodeURIComponent(w.user)}`)).json()) as {
+        held?: string;
+        assets?: Record<string, string>;
+      };
       setHolding(r.held ?? null);
+      setAssets(r.assets ?? {});
     } catch {
       setHolding(null);
     }
   };
 
-  /** Check every message against the order's limits, have the wallet sign them, and hand the signatures back. */
-  const signAll = async (o: Order, w: { chain: Chain; user: string }) => {
-    if (!o.toSign || !o.rules || signing.current === o.toSign.map((t) => t.payload).join("|")) return;
+  /**
+   * Check every message, have the wallet sign them, and hand the signatures back. Returns false when nothing was
+   * signed (the user said no, or a check failed), so the caller doesn't ask again on its own.
+   */
+  const signAll = async (o: Order, w: { chain: Chain; user: string }): Promise<boolean> => {
+    if (!o.toSign || !o.rules || signing.current === o.toSign.map((t) => t.payload).join("|")) return false;
     signing.current = o.toSign.map((t) => t.payload).join("|");
     setBusy("sign");
     try {
-      // Who signs, for which contract and which coin come from this page and the wallet, never from the server.
-      const rules = { ...o.rules, signer: intentsIdFor(w.chain, w.user), verifier: deployment.verifier, coin, latest: new Date(o.rules.latest) };
+      // Who signs, for which contract and which coin come from this page and the wallet, never from the server;
+      // the spending caps cover all the messages together.
+      const signer = intentsIdFor(w.chain, w.user);
+      const rules = { ...o.rules, signer, verifier: deployment.verifier, coin, latest: new Date(o.rules.latest) };
+      checkPayloads(
+        o.toSign.map((t) => t.payload),
+        rules,
+      );
+      // Every address a swap pays must be a real 1Click quote, asked of 1Click directly so our server can't slip in
+      // an address of its own: it pays and refunds only this wallet, into a basket asset of this buy (or USDC on the
+      // wallet's own chain for a cash-out), with at most 3% slippage, for at least what the message sends.
+      const buy = o.toSign.find((t) => t.kind === "buy");
+      const basket = buy ? Object.keys((JSON.parse(buy.payload) as { intents: { tokens: Record<string, string> }[] }).intents[0]!.tokens) : [];
+      const destinations = o.kind === "cashout" ? [USDC_ASSET[w.chain]] : basket;
+      const checks = o.toSign.flatMap((t) =>
+        rules.receivers.filter((x) => x !== coin && t.payload.includes(`"${x}"`)).map(async (r) => {
+          const res = await fetch(`${ONECLICK_URL}/v0/status?depositAddress=${encodeURIComponent(r)}`);
+          if (!res.ok) throw new Error(`Refusing to sign: 1Click doesn't know the deposit address ${r.slice(0, 12)}….`);
+          checkOneClickDeposit(await res.json(), { route: o.kind === "cashout" ? "cashout" : "swap", ...sentTo(t.payload, r), intentsId: signer, wallet: w.user, destinations });
+        }),
+      );
+      await Promise.all(checks);
       const signed: SignedIntent[] = [];
       for (const t of o.toSign) {
-        checkPayload(t.payload, rules);
         signed.push(w.chain === "base" ? await signWithMetaMask(w.user, t.payload) : await signWithPhantom(t.payload));
       }
       const r = await fetch(`/api/xbuy/${o.id}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ signed }) });
       const next = (await r.json()) as Order & { error?: string };
       if (!r.ok) throw new Error(next.error ?? "Couldn't submit the signatures.");
       setOrder((cur) => ({ ...(cur ?? next), ...next }));
+      return true;
     } catch (e) {
       setErr(friendly(e));
       signing.current = null;
       if (timer.current) clearInterval(timer.current);
+      return false;
     } finally {
       setBusy(null);
     }
@@ -128,6 +157,18 @@ export function XChainBuy({ coin, ticker, usd, minUsd = 0, className }: { coin: 
       const r = await fetch("/api/xbuy", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ coin, chain, user: w.user, usd }) });
       const q = (await r.json()) as { id?: string; depositAddress: string; amount: string; token: string; decimals: number; error?: string };
       if (!r.ok || !q.id) throw new Error(q.error ?? "Couldn't start the buy.");
+      // Before any USDC leaves the wallet: the deposit address must be a real 1Click quote (asked of 1Click directly)
+      // that delivers this USDC into the wallet's own NEAR Intents account and refunds to the wallet on its chain.
+      const st = await fetch(`${ONECLICK_URL}/v0/status?depositAddress=${encodeURIComponent(q.depositAddress)}`);
+      if (!st.ok) throw new Error("Refusing to send: 1Click doesn't know this deposit address.");
+      checkOneClickDeposit(await st.json(), {
+        route: "deposit",
+        token: USDC_ASSET[chain],
+        amount: q.amount,
+        intentsId: intentsIdFor(chain, w.user),
+        wallet: w.user,
+        destinations: [NEAR_USDC_ASSET],
+      });
       const hash = chain === "base" ? await sendUsdcOnBase(w.user, q.token, q.depositAddress, BigInt(q.amount)) : await sendUsdcOnSolana(w.user, q.token, q.depositAddress, BigInt(q.amount), q.decimals);
       setSentTx({ chain, hash });
       void fetch(`/api/xbuy/${q.id}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ txHash: hash }) });
@@ -153,8 +194,7 @@ export function XChainBuy({ coin, ticker, usd, minUsd = 0, className }: { coin: 
       setSentTx(null);
       setOrder(o);
       setBusy(null);
-      await signAll(o, w);
-      poll(o.id, w);
+      if (await signAll(o, w)) poll(o.id, w);
     } catch (e) {
       setErr(friendly(e));
     } finally {
@@ -172,6 +212,7 @@ export function XChainBuy({ coin, ticker, usd, minUsd = 0, className }: { coin: 
   };
 
   const hasHolding = holding !== null && BigInt(holding || "0") > 0n;
+  const hasAssets = Object.keys(assets).length > 0;
   const stage = order?.kind === "buy" ? (STAGE[order.status] ?? 1) : 0;
 
   return (
@@ -185,6 +226,12 @@ export function XChainBuy({ coin, ticker, usd, minUsd = 0, className }: { coin: 
             One USDC transfer into NEAR Intents under your own wallet&apos;s address, then you sign the swaps and the buy as messages. Your wallet
             controls the funds at every step; our account only pays NEAR gas.
           </p>
+          {wallet && hasAssets && (
+            <div className="flex items-center justify-between gap-3 rounded-[18px] bg-[#F6F6F6] px-4 py-3 text-sm">
+              <span>USDC or basket assets are waiting in your NEAR Intents account</span>
+              <ActionPill onClick={() => void startAction("cashout")} disabled={!!busy} label={busy === "cashout" ? "Preparing…" : "Cash out"} />
+            </div>
+          )}
           {hasHolding && wallet ? (
             <HoldingRow ticker={ticker} held={holding} busy={busy} onSell={() => void startAction("sell")} />
           ) : (
@@ -250,6 +297,9 @@ export function XChainBuy({ coin, ticker, usd, minUsd = 0, className }: { coin: 
               />
             )}
             {order.status === "done" && hasHolding && <ActionPill onClick={() => void startAction("sell")} disabled={!!busy} label={busy === "sell" ? "Preparing…" : `Sell all $${ticker}`} />}
+            {(order.status === "error" || (order.status === "done" && order.kind !== "cashout")) && order.kind !== "sell" && hasAssets && (
+              <ActionPill onClick={() => void startAction("cashout")} disabled={!!busy} label={busy === "cashout" ? "Preparing…" : "Cash out"} />
+            )}
             {order.status === "done" && order.kind === "sell" && <ActionPill onClick={() => void startAction("cashout")} disabled={!!busy} label={busy === "cashout" ? "Preparing…" : `Cash out to USDC on ${wallet ? chainName(wallet.chain) : ""}`} />}
             {["done", "refunded", "error"].includes(order.status) && (
               <button type="button" className="h-9 rounded-full bg-[#ECECEC] px-4 text-sm font-semibold" onClick={() => setOrder(null)}>

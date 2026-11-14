@@ -12,6 +12,15 @@
 import { base58 } from "./nep413.ts";
 
 export type XChain = "base" | "solana";
+
+/** NEAR's native USDC as NEAR Intents names it: what a Base/Solana deposit becomes inside NEAR Intents. */
+export const NEAR_USDC_ASSET = "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1";
+
+/** USDC on each wallet's own chain, as NEAR Intents names it: where a cash-out may end up. */
+export const USDC_ASSET: Record<XChain, string> = {
+  base: "nep141:base-0x833589fcd6edb6e08f4c7c32d4f71b54bda02913.omft.near",
+  solana: "nep141:sol-5ce3bf3a31af18be40ba30f721101b4341690186.omft.near",
+};
 export type SignedIntent =
   | { standard: "erc191"; payload: string; signature: string }
   | { standard: "raw_ed25519"; payload: string; public_key: string; signature: string };
@@ -125,7 +134,7 @@ export type SigningRules = {
  * withdrawal must be a sell paying the signer. Anything else throws, so the server can't get a wallet to sign
  * away its balance.
  */
-export function checkPayload(payload: string, r: SigningRules): void {
+export function checkPayload(payload: string, r: SigningRules): Record<string, bigint> {
   const fail = (why: string): never => {
     throw new Error(`Refusing to sign: ${why}.`);
   };
@@ -152,31 +161,53 @@ export function checkPayload(payload: string, r: SigningRules): void {
       const tokens = (it.tokens ?? {}) as Record<string, unknown>;
       for (const [t, a] of Object.entries(tokens)) add(t, a);
       if (to === r.coin) {
-        let m: { action?: unknown; deliver?: unknown };
+        let m: Record<string, unknown>;
         try {
           m = JSON.parse(String(it.msg));
         } catch {
           return fail("the coin transfer has no buy message");
         }
         if (m.action !== "buy" || m.deliver !== true) fail("the coin transfer is not a delivered buy");
+        // The coins go to the signer (no other recipient), with a real slippage limit.
+        if (Object.keys(m).some((k) => !["action", "deliver", "min_tokens_out", "recipient"].includes(k))) fail("the buy message has extra fields");
+        if (m.recipient !== undefined && m.recipient !== r.signer) fail(`the buy pays ${String(m.recipient)}`);
+        if (typeof m.min_tokens_out !== "string" || !/^\d+$/.test(m.min_tokens_out) || BigInt(m.min_tokens_out) === 0n) fail("the buy has no slippage limit");
       } else if (it.msg !== undefined) fail("a swap transfer carries a message");
     } else if (it.intent === "ft_withdraw") {
       if (it.token !== r.coin || it.receiver_id !== r.coin) fail("it withdraws something other than the coin");
-      let m: { action?: unknown; receiver_id?: unknown };
+      let m: Record<string, unknown>;
       try {
         m = JSON.parse(String(it.msg));
       } catch {
         return fail("the withdrawal has no sell message");
       }
       if (m.action !== "sell" || m.receiver_id !== r.signer) fail("the withdrawal is not a sell paying you");
+      if (typeof m.min_bu_out !== "string" || !/^\d+$/.test(m.min_bu_out) || BigInt(m.min_bu_out) === 0n) fail("the sell has no slippage limit");
       add(`nep141:${r.coin}`, it.amount);
     } else fail(`it contains a ${String(it.intent)} intent`);
   }
+  capSpend(spent, r.maxSpend, fail);
+  return spent;
+}
+
+function capSpend(spent: Record<string, bigint>, maxSpend: Record<string, string>, fail: (why: string) => never) {
   for (const [t, a] of Object.entries(spent)) {
-    const cap = r.maxSpend[t];
+    const cap = maxSpend[t];
     if (cap === undefined) fail(`it spends ${t}`);
     if (a > BigInt(cap as string)) fail(`it spends ${a} of ${t}, more than ${cap}`);
   }
+}
+
+/**
+ * Every payload of one order, checked one by one and then together: `maxSpend` caps the whole order, so two
+ * payloads that each fit can't add up to more than it.
+ */
+export function checkPayloads(payloads: string[], r: SigningRules): void {
+  const total: Record<string, bigint> = {};
+  for (const p of payloads) for (const [t, a] of Object.entries(checkPayload(p, r))) total[t] = (total[t] ?? 0n) + a;
+  capSpend(total, r.maxSpend, (why) => {
+    throw new Error(`Refusing to sign: together the messages ${why.replace(/^it /, "")}.`);
+  });
 }
 
 /** MetaMask `personal_sign` result (0x r||s||v, v 27/28 or 0/1) as NEAR Intents' ERC-191 signed payload. */
@@ -193,4 +224,74 @@ export function erc191Signed(payload: string, sigHex: string): SignedIntent {
 export function rawEd25519Signed(payload: string, publicKey: Uint8Array, signature: Uint8Array): SignedIntent {
   if (publicKey.length !== 32 || signature.length !== 64) throw new Error("bad ed25519 key or signature");
   return { standard: "raw_ed25519", payload, public_key: `ed25519:${base58(publicKey)}`, signature: `ed25519:${base58(signature)}` };
+}
+
+/** What 1Click's `/v0/status?depositAddress=` says about a deposit address (only the fields we check). */
+export type OneClickStatus = {
+  quoteResponse?: {
+    quoteRequest?: {
+      originAsset?: string;
+      destinationAsset?: string;
+      depositType?: string;
+      recipient?: string;
+      recipientType?: string;
+      refundTo?: string;
+      refundType?: string;
+      slippageTolerance?: number;
+    };
+    quote?: { amountIn?: string };
+  };
+};
+
+/**
+ * Checked with 1Click itself, not with our server: a deposit address a message pays must be a real 1Click quote
+ * for the token being sent, paying out and refunding only to this wallet (its NEAR Intents account, or its own
+ * address on its own chain). A made-up address returns 404 from 1Click and never reaches this check.
+ */
+export function checkOneClickDeposit(
+  status: OneClickStatus,
+  want: {
+    /**
+     * swap: inside NEAR Intents, paid and refunded to the wallet's NEAR Intents account (a buy leg).
+     * cashout: from NEAR Intents to the wallet's own address on its chain, refunded inside NEAR Intents.
+     * deposit: from the wallet's chain into its NEAR Intents account, refunded to the wallet on its chain.
+     */
+    route: "swap" | "cashout" | "deposit";
+    token: string;
+    /** Raw amount the message sends to this address: at most what the quote takes. */
+    amount: string;
+    intentsId: string;
+    wallet: string;
+    /** Tokens this swap may turn into (a basket asset for a buy; USDC on the wallet's chain for a cash-out). */
+    destinations: string[];
+    /** Most slippage accepted, in basis points. */
+    maxSlippageBps?: number;
+  },
+): void {
+  const q = status.quoteResponse?.quoteRequest;
+  const fail = (why: string): never => {
+    throw new Error(`Refusing to sign: the 1Click deposit address ${why}.`);
+  };
+  if (!q) return fail("has no quote");
+  const depositType = want.route === "deposit" ? "ORIGIN_CHAIN" : "INTENTS";
+  if (q.depositType !== depositType || q.originAsset !== want.token) fail(`is for ${String(q.originAsset)}`);
+  const intents = (who: unknown, type: unknown) => type === "INTENTS" && who === want.intentsId;
+  const wallet = (who: unknown, type: unknown, t: string) => type === t && typeof who === "string" && who.toLowerCase() === want.wallet.toLowerCase();
+  const paysOk = want.route === "cashout" ? wallet(q.recipient, q.recipientType, "DESTINATION_CHAIN") : intents(q.recipient, q.recipientType);
+  const refundOk = want.route === "deposit" ? wallet(q.refundTo, q.refundType, "ORIGIN_CHAIN") : intents(q.refundTo, q.refundType);
+  if (!paysOk) fail(`pays ${String(q.recipient)} (${String(q.recipientType)})`);
+  if (!refundOk) fail(`refunds to ${String(q.refundTo)} (${String(q.refundType)})`);
+  if (!want.destinations.includes(String(q.destinationAsset))) fail(`swaps into ${String(q.destinationAsset)}`);
+  if (typeof q.slippageTolerance !== "number" || q.slippageTolerance > (want.maxSlippageBps ?? 300)) fail(`allows ${String(q.slippageTolerance)} bps of slippage`);
+  const quotedIn = status.quoteResponse?.quote?.amountIn;
+  if (!quotedIn || !/^\d+$/.test(want.amount) || BigInt(want.amount) > BigInt(quotedIn)) fail(`was quoted for ${String(quotedIn)}, less than the ${want.amount} sent`);
+}
+
+/** The single token (and amount) a 1Click swap message sends to `depositAddress`. */
+export function sentTo(payload: string, depositAddress: string): { token: string; amount: string } {
+  const p = JSON.parse(payload) as { intents?: { intent?: string; receiver_id?: string; tokens?: Record<string, string> }[] };
+  const it = (p.intents ?? []).find((i) => i.intent === "transfer" && i.receiver_id === depositAddress);
+  const keys = Object.keys(it?.tokens ?? {});
+  if (keys.length !== 1) throw new Error("Refusing to sign: a swap message must send exactly one token.");
+  return { token: keys[0]!, amount: String(it!.tokens![keys[0]!]) };
 }

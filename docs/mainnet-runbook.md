@@ -78,7 +78,7 @@ it ends.
    sell that can't fill uses nothing, so NEAR Intents refunds the tokens to the holder.
 2. **Cash out**: the wallet signs one 1Click swap per asset held, to USDC on Base or Solana, paid to its own address.
 
-Orders are kept in `~/backed-ops/xbuy-orders.json` (outside the repo) so a server restart doesn't lose them.
+Orders are kept in MongoDB when `MONGODB_URI` is set (needed on Vercel, where requests share no disk; database `MONGODB_DB`, default `basketcase`, collection `xbuy_orders`, entries expire after 14 days). Without it they go to `~/backed-ops/xbuy-orders.json` (outside the repo), so a restart of a long-running server doesn't lose them.
 
 Tested without spending: contract unit tests for the delivered buy and the verifier sell (`contracts/coin/src/tests.rs`),
 client tests that sign with real secp256k1 and ed25519 keys (`packages/client/test/intents.test.ts`), and

@@ -24,6 +24,7 @@
     "@solana/spl-token": "0.4.13",
     "@solana/web3.js": "1.98.4",
     "lightweight-charts": "5.2.1",
+    "mongodb": "6.21.0",
     "near-api-js": "7.4.0",
     "next": "16.4.6",
     "react": "19.3.1",

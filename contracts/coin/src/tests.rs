@@ -692,6 +692,69 @@ fn near_intents_can_sell_a_holders_tokens_back_to_the_coin() {
     assert!(u(&q["out_bu"]) > 0);
 }
 
+fn as_callback(result: near_sdk::PromiseResult) {
+    testing_env!(
+        VMContextBuilder::new().current_account_id(acc(COIN)).predecessor_account_id(acc(COIN)).block_timestamp(WINDOW_END * 1_000_000).build(),
+        near_sdk::test_vm_config(),
+        near_sdk::RuntimeFeesConfig::test(),
+        Default::default(),
+        vec![result]
+    );
+}
+
+#[test]
+fn a_delivery_near_intents_refuses_is_credited_to_the_buyer_not_the_pool() {
+    let mut c = curve_coin();
+    register(&mut c, VERIFIER, WINDOW_END);
+    deliver_buy(&mut c, EVM_BUYER, 1_000 * E18, WINDOW_END);
+    let minted = bal(&c, VERIFIER);
+    let pool_before = bal(&c, COIN);
+    as_callback(near_sdk::PromiseResult::Failed);
+    c.on_delivered(acc(EVM_BUYER), U128(minted));
+    assert_eq!(bal(&c, VERIFIER), 0);
+    assert_eq!(bal(&c, EVM_BUYER), minted);
+    assert_eq!(bal(&c, COIN), pool_before);
+}
+
+#[test]
+fn coins_parked_by_a_failed_delivery_can_be_redelivered_by_anyone() {
+    let mut c = curve_coin();
+    register(&mut c, VERIFIER, WINDOW_END);
+    deliver_buy(&mut c, EVM_BUYER, 1_000 * E18, WINDOW_END);
+    let minted = bal(&c, VERIFIER);
+    as_callback(near_sdk::PromiseResult::Failed);
+    c.on_delivered(acc(EVM_BUYER), U128(minted));
+    assert_eq!(bal(&c, EVM_BUYER), minted);
+    at("anyone.near", WINDOW_END, 0);
+    c.redeliver(acc(EVM_BUYER));
+    assert_eq!(bal(&c, EVM_BUYER), 0);
+    assert_eq!(bal(&c, VERIFIER), minted);
+    // Once delivered, nothing is parked any more.
+    at("anyone.near", WINDOW_END, 0);
+    assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| c.redeliver(acc(EVM_BUYER)))).is_err());
+}
+
+#[test]
+#[should_panic(expected = "nothing parked to deliver")]
+fn redeliver_never_moves_coins_that_were_not_parked() {
+    let mut c = curve_coin();
+    buy(&mut c, EVM_BUYER, 1_000 * E18, 0, WINDOW_END);
+    at("anyone.near", WINDOW_END, 0);
+    c.redeliver(acc(EVM_BUYER));
+}
+
+#[test]
+fn a_delivery_near_intents_takes_stays_with_near_intents() {
+    let mut c = curve_coin();
+    register(&mut c, VERIFIER, WINDOW_END);
+    deliver_buy(&mut c, EVM_BUYER, 1_000 * E18, WINDOW_END);
+    let minted = bal(&c, VERIFIER);
+    as_callback(near_sdk::PromiseResult::Successful(b"\"0\"".to_vec()));
+    c.on_delivered(acc(EVM_BUYER), U128(minted));
+    assert_eq!(bal(&c, VERIFIER), minted);
+    assert_eq!(bal(&c, EVM_BUYER), 0);
+}
+
 #[test]
 fn a_near_intents_sell_that_cannot_fill_uses_nothing_so_the_holder_is_refunded() {
     // NEAR Intents keeps the tokens of a withdrawal whose ft_transfer_call panics, so a failed sell must not panic.

@@ -1,12 +1,12 @@
 # AGENTS.md
 
-Backed (working name): a NEAR memecoin launchpad where each coin's vault holds a basket of assets and the floor is computed by the contract. NEAR HACKATHON entry, deadline 2026-11-14 23:59 UTC. Live on NEAR testnet only; nothing is deployed on mainnet.
+Basketcase: a NEAR memecoin launchpad where each coin's vault holds a basket of assets and the floor is computed by the contract. NEAR HACKATHON entry, deadline 2026-11-14 23:59 UTC. Live on NEAR testnet only; nothing is deployed on mainnet.
 
 ## Source of truth
 
 Read in this order; where they disagree, the earlier one wins.
 
-1. `README.md`: what the product is, what is live, every claim with its evidence, trust assumptions.
+1. `README.md` (short overview) and `docs/technical.md` (the full technical README: claims and evidence, trust, setup): what the product is, what is live, every claim with its evidence, trust assumptions.
 2. `ARCHITECTURE.md`: code structure, each flow end to end with its files and tests, how to run and verify.
 3. `docs/interface.md`: exact contract methods and JSON shapes.
 4. `docs/mainnet-runbook.md`: the mainnet steps, costs and cleanup.

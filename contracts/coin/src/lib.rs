@@ -34,6 +34,7 @@ enum Key {
     Tombstones,
     Log,
     Owed,
+    Parked,
 }
 
 #[near(serializers = [json])]
@@ -185,6 +186,8 @@ pub struct Coin {
     log: Vector<LogEntry>,
     log_next: u32,
     owed: LookupMap<AccountId, Vec<(String, u128)>>,
+    /// Coins of delivered buys NEAR Intents didn't take, held in the buyer's own balance until `redeliver`.
+    parked: LookupMap<AccountId, u128>,
     graduated_ms: Option<u64>,
 }
 
@@ -279,6 +282,7 @@ impl Coin {
             log: Vector::new(Key::Log),
             log_next: 0,
             owed: LookupMap::new(Key::Owed),
+            parked: LookupMap::new(Key::Parked),
             graduated_ms: None,
         };
         this.token.internal_register_account(&env::current_account_id());
@@ -325,16 +329,15 @@ impl Coin {
         near_contract_standards::fungible_token::events::FtBurn { owner_id: account_id, amount: U128(amount), memo: None }.emit();
     }
 
-    /// Tokens just minted to the verifier's balance: tell it (NEP-141 `ft_on_transfer`) whose they are. NEAR Intents
-    /// reads `msg` as the receiver. Anything it doesn't take comes back to this contract via `ft_resolve_transfer`.
+    /// Tokens just credited to the verifier's balance (the buy already emitted that event): tell it (NEP-141
+    /// `ft_on_transfer`) whose they are. NEAR Intents reads `msg` as the receiver. Anything it doesn't take goes to
+    /// the receiver's own balance on this coin (`on_delivered`), never to the coin's pool.
     pub(crate) fn notify_verifier(&mut self, receiver: &AccountId, amount: u128) {
         let me = env::current_account_id();
-        let verifier = self.cfg.verifier.clone();
-        near_contract_standards::fungible_token::events::FtTransfer { old_owner_id: &me, new_owner_id: &verifier, amount: U128(amount), memo: Some("buy delivered to NEAR Intents") }.emit();
-        near_contract_standards::fungible_token::receiver::ext_ft_receiver::ext(verifier.clone())
-            .with_static_gas(near_sdk::Gas::from_tgas(30))
+        near_contract_standards::fungible_token::receiver::ext_ft_receiver::ext(self.cfg.verifier.clone())
+            .with_static_gas(near_sdk::Gas::from_tgas(40))
             .ft_on_transfer(me.clone(), U128(amount), receiver.to_string())
-            .then(Self::ext(me.clone()).with_static_gas(near_sdk::Gas::from_tgas(10)).ft_resolve_transfer(me, verifier, U128(amount)))
+            .then(Self::ext(me).with_static_gas(near_sdk::Gas::from_tgas(10)).on_delivered(receiver.clone(), U128(amount)))
             .detach();
     }
 

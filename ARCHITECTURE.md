@@ -1,6 +1,6 @@
 # Architecture
 
-How the code is laid out, how each flow runs end to end, and how to check it. Every statement points at a file, a test, a command or a transaction. The product itself is described in [README.md](README.md); exact contract methods and JSON shapes are in [docs/interface.md](docs/interface.md).
+How the code is laid out, how each flow runs end to end, and how to check it. Every statement points at a file, a test, a command or a transaction. The product overview is the [README](README.md), the full technical reference is [docs/technical.md](docs/technical.md); exact contract methods and JSON shapes are in [docs/interface.md](docs/interface.md).
 
 **Where it runs.** Everything is deployed on NEAR testnet only. NEAR Intents has no testnet, so testnet uses two stand-in contracts with the same call shapes (`contracts/mock-intents` for `intents.near`, `contracts/mock-swapper` for 1Click). Nothing is deployed on mainnet yet. The mainnet code paths are written, unit-tested and checked read-only against mainnet, but **no real funds have moved through them** (see [What is not tested](#what-is-not-tested)).
 
@@ -246,4 +246,4 @@ Needs Rust (stable) with the `wasm32-unknown-unknown` target, Node 22+, pnpm 10,
 - Nothing is deployed on mainnet yet. `deployments/mainnet.json` still has placeholder accounts.
 - The automatic Rhea listing has run on testnet only.
 
-Trust assumptions (the factory key, the price reporter, the vault host, the cross-chain relayer) are listed in [README.md](README.md#trust-assumptions).
+Trust assumptions (the factory key, the price reporter, the vault host, the cross-chain relayer) are listed in [docs/technical.md](docs/technical.md#trust-assumptions).

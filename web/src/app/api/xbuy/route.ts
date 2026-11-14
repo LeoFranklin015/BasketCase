@@ -2,12 +2,14 @@
 //   Returns the 1Click deposit address the buyer's wallet sends USDC to. See src/lib/server/xbuy.ts.
 // POST /api/xbuy {action: "sell", coin, chain, user, amount|"all"}: sell coins the wallet holds in NEAR Intents.
 // POST /api/xbuy {action: "cashout", coin, chain, user}: swap what the sell returned to USDC on the wallet's chain.
-// GET /api/xbuy?coin&chain&user: the wallet's balance of the coin in NEAR Intents.
+// GET /api/xbuy?coin&chain&user: the wallet's balance of the coin in NEAR Intents, and the USDC and basket
+//   assets it holds there that a cash-out can send home.
 import { NET } from "@/lib/config";
-import { USDC_ON, heldInIntents, intentsIdFor, publicOrder, start, startCashout, startSell, type XChain } from "@/lib/server/xbuy";
+import { USDC_ON, assetsInIntents, heldInIntents, redeliverParked, intentsIdFor, publicOrder, start, startCashout, startSell, type XChain } from "@/lib/server/xbuy";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const hits = new Map<string, number[]>();
 function allowed(ip: string): boolean {
@@ -51,7 +53,10 @@ export async function GET(req: Request) {
   if (!coin || !chain || !user) return Response.json({ error: "coin, chain and user are required" }, { status: 400 });
   try {
     const intentsId = intentsIdFor(chain, user);
-    return Response.json({ intentsId, held: await heldInIntents(coin, intentsId) });
+    // Coins a delivery left parked on the coin go into NEAR Intents first (best effort; anyone may do this).
+    await redeliverParked(coin, intentsId).catch(() => undefined);
+    const [held, assets] = await Promise.all([heldInIntents(coin, intentsId), assetsInIntents(coin, intentsId)]);
+    return Response.json({ intentsId, held, assets });
   } catch (e) {
     return Response.json({ error: e instanceof Error ? e.message : String(e) }, { status: 400 });
   }

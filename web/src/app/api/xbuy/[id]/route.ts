@@ -2,11 +2,13 @@
 // wallet, the reply carries the exact messages to sign and the limits the browser checks before signing.
 // POST /api/xbuy/<id> {txHash}: tell 1Click about the deposit transaction so it is picked up sooner.
 // POST /api/xbuy/<id> {signed: [...]}: the wallet's signatures, in order.
-import { ONECLICK, advance, getOrder, heldInIntents, publicOrder, submitSignatures } from "@/lib/server/xbuy";
+import { ONECLICK, advance, heldInIntents, loadOrder, publicOrder, submitSignatures } from "@/lib/server/xbuy";
 import type { SignedIntent } from "@backed/client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// Each poll may wait on 1Click and NEAR (quotes, a relayed transaction): allow up to a minute on serverless hosts.
+export const maxDuration = 60;
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -20,7 +22,7 @@ export async function GET(_req: Request, ctx: Ctx) {
 
 export async function POST(req: Request, ctx: Ctx) {
   const { id } = await ctx.params;
-  const o = getOrder(id);
+  const o = await loadOrder(id);
   if (!o) return Response.json({ error: "no such order" }, { status: 404 });
   const b = (await req.json().catch(() => null)) as { txHash?: string; signed?: SignedIntent[] } | null;
   if (b?.signed) {

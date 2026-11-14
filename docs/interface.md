@@ -130,6 +130,7 @@ type LogEntry = { ts_ms: number; kind: "mint" | "burn"; account_id: string; toke
 | `settle_launch` | none | `{limit}` | Anyone, after the window |
 | `claim_fees` | none | `{}` | Pays creator and protocol |
 | `withdraw_owed` | none | `{account_id}` | Retries failed payouts |
+| `redeliver` | none | `{account_id}` | Moves a wallet account's (`0x`+40 hex, or 64 hex) direct coin balance into NEAR Intents under that same account; anyone may call it |
 
 **Buy.** Call the verifier:
 
@@ -145,7 +146,7 @@ type LogEntry = { ts_ms: number; kind: "mint" | "burn"; account_id: string; toke
 
 It needs 1 yocto and 250 TGas. Unused amounts come back automatically. In the fair-launch window a buy is queued: it needs at least 1 BU after the fee, `min_tokens_out` is ignored, and the tokens are minted by `settle_launch`.
 
-With `deliver: true` the coin mints to the verifier's own balance and calls `<verifier>.ft_on_transfer({sender_id: <coin>, amount, msg: <recipient>})`, so the tokens are credited to `recipient` (default: the sender) inside NEAR Intents. The verifier must be registered on the coin (`storage_deposit` for the verifier account). A delivered buy during the fair-launch window is refunded in full (`deliver_after_launch`).
+With `deliver: true` the coin mints to the verifier's own balance and calls `<verifier>.ft_on_transfer({sender_id: <coin>, amount, msg: <recipient>})`, so the tokens are credited to `recipient` (default: the sender) inside NEAR Intents. The verifier must be registered on the coin (`storage_deposit` for the verifier account). A delivered buy during the fair-launch window is refunded in full (`deliver_after_launch`). If NEAR Intents does not take the delivery, the private callback `on_delivered` credits the unused part to the buyer's own balance on the coin (never the pool), and `redeliver` moves it into NEAR Intents later.
 
 **Fill an auction.** Call `<verifier>.mt_transfer_call({receiver_id: <coin>, token_id: auction.replacement, amount, msg: JSON.stringify({action: "fill_auction", min_out})})`.
 
@@ -202,4 +203,4 @@ Built by `packages/client/src/intents.ts`; the formats follow the NEAR Intents c
 - **Buy intent.** `{"intent":"transfer","receiver_id":<coin>,"tokens":{<token_id>:<amount>,…},"msg":"{\"action\":\"buy\",\"deliver\":true,\"min_tokens_out\":\"…\"}","min_gas":"150000000000000"}`. NEAR Intents calls the coin's `mt_on_transfer` with the signer as `sender_id`.
 - **Sell intent.** `{"intent":"ft_withdraw","token":<coin>,"receiver_id":<coin>,"amount","msg":"{\"action\":\"sell\",\"min_bu_out\":\"…\",\"receiver_id\":<signer>}","min_gas":"150000000000000"}`. NEAR Intents calls the coin's `ft_transfer_call` (see Change methods).
 - **Submission.** Any account may call `intents.near.execute_intents({signed: [...]})`; ours runs `simulate_intents({signed})` (a view) first. The submitter pays gas and cannot change a signed payload.
-- **Before signing.** `checkPayload(payload, rules)` refuses a payload for another verifier or signer, a deadline out of range, a transfer to anyone but the order's receivers, a coin transfer that is not a delivered buy, a withdrawal that is not a sell of the coin paying the signer, any other intent type, or spending above the order's caps.
+- **Before signing.** `checkPayload(payload, rules)` refuses a payload for another verifier or signer, a deadline out of range, a transfer to anyone but the order's receivers, a coin transfer that is not a delivered buy (or one paying another recipient, or with no `min_tokens_out`), a withdrawal that is not a sell of the coin paying the signer (or one with no `min_bu_out`), any other intent type, or spending above the order's caps. `checkPayloads` applies the caps to all of an order's messages together. `checkOneClickDeposit` asks 1Click itself (`/v0/status`) about every deposit address a message pays: it must be a real quote for the token sent, for at least the amount sent, into an allowed destination, with at most 3% slippage, paying and refunding only the signer's own account or wallet address.

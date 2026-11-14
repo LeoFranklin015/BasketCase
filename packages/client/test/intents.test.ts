@@ -6,6 +6,9 @@ import {
   base58Decode,
   buyIntent,
   checkPayload,
+  checkPayloads,
+  checkOneClickDeposit,
+  sentTo,
   erc191Signed,
   hexToBytes,
   intentsIdFor,
@@ -94,7 +97,12 @@ describe("checkPayload", () => {
   it("accepts a 1Click swap transfer and a delivered buy within the caps", () => {
     expect(() => checkPayload(mk([{ intent: "transfer", receiver_id: "depo1", tokens: { [USDC]: "2000000" } }]), rules)).not.toThrow();
     expect(() => checkPayload(mk([buyIntent(COIN, { [USDC]: "2900000", [BTC]: "2999" }, "1")]), rules)).not.toThrow();
-    expect(() => checkPayload(mk([sellIntent(COIN, "100", "0", me)]), { ...rules, maxSpend: { [`nep141:${COIN}`]: "100" } })).not.toThrow();
+    const buyWith = (msg: object) => mk([{ intent: "transfer", receiver_id: COIN, tokens: { [USDC]: "1" }, msg: JSON.stringify({ action: "buy", deliver: true, min_tokens_out: "1", ...msg }) }]);
+    expect(() => checkPayload(buyWith({ recipient: "thief.near" }), rules)).toThrow("the buy pays thief.near");
+    expect(() => checkPayload(buyWith({ min_tokens_out: "0" }), rules)).toThrow("no slippage limit");
+    expect(() => checkPayload(buyWith({ extra: 1 }), rules)).toThrow("extra fields");
+    expect(() => checkPayload(mk([sellIntent(COIN, "100", "0", me)]), { ...rules, maxSpend: { [`nep141:${COIN}`]: "100" } })).toThrow("no slippage limit");
+    expect(() => checkPayload(mk([sellIntent(COIN, "100", "5", me)]), { ...rules, maxSpend: { [`nep141:${COIN}`]: "100" } })).not.toThrow();
   });
 
   it("refuses anything else", () => {
@@ -113,5 +121,47 @@ describe("checkPayload", () => {
     for (const [p, why] of bad) expect(() => checkPayload(p, rules), why).toThrow(why);
   });
 
+  it("caps the whole order, not each message", () => {
+    const swap = mk([{ intent: "transfer", receiver_id: "depo1", tokens: { [USDC]: "3000000" } }]);
+    expect(() => checkPayload(swap, rules)).not.toThrow();
+    expect(() => checkPayloads([swap, swap], rules)).toThrow("together the messages spends 6000000");
+    expect(() => checkPayloads([swap], rules)).not.toThrow();
+  });
+
   it("hexToBytes rejects odd input", () => expect(() => hexToBytes("0xabc")).toThrow());
+});
+
+describe("checkOneClickDeposit", () => {
+  const me = "0xd8da6bf26964af9d7eed9e03e53415d37aa96045";
+  const quote = (q: Record<string, string>) => ({
+    quoteResponse: {
+      quoteRequest: { originAsset: USDC, destinationAsset: BTC, depositType: "INTENTS", recipient: me, recipientType: "INTENTS", refundTo: me, refundType: "INTENTS", slippageTolerance: 100, ...q },
+      quote: { amountIn: "2000000" },
+    },
+  });
+  const want = { route: "swap" as const, token: USDC, amount: "2000000", intentsId: me, wallet: "0xD8dA6BF26964aF9D7eEd9e03E53415D37aA96045", destinations: [BTC] };
+  it("accepts a swap paying the wallet's own NEAR Intents account, or a cash-out to its own address", () => {
+    expect(() => checkOneClickDeposit(quote({}), want)).not.toThrow();
+    expect(() => checkOneClickDeposit(quote({ recipient: want.wallet, recipientType: "DESTINATION_CHAIN" }), { ...want, route: "cashout" })).not.toThrow();
+    // The first deposit: from the wallet's chain into its NEAR Intents account, refunded on its chain.
+    expect(() => checkOneClickDeposit(quote({ depositType: "ORIGIN_CHAIN", refundTo: want.wallet, refundType: "ORIGIN_CHAIN" }), { ...want, route: "deposit" })).not.toThrow();
+  });
+  it("refuses quotes that pay or refund anyone else, or take another token", () => {
+    expect(() => checkOneClickDeposit(quote({ recipient: "thief.near" }), want)).toThrow("pays thief.near");
+    // A buy leg may not pay out on another chain, and a cash-out may not stay inside NEAR Intents.
+    expect(() => checkOneClickDeposit(quote({ recipient: want.wallet, recipientType: "DESTINATION_CHAIN" }), want)).toThrow("pays");
+    expect(() => checkOneClickDeposit(quote({}), { ...want, route: "cashout" })).toThrow("pays");
+    expect(() => checkOneClickDeposit(quote({ refundTo: "0x2222222222222222222222222222222222222222", refundType: "ORIGIN_CHAIN", depositType: "ORIGIN_CHAIN" }), { ...want, route: "deposit" })).toThrow("refunds to");
+    expect(() => checkOneClickDeposit(quote({ refundTo: "thief.near" }), want)).toThrow("refunds to");
+    expect(() => checkOneClickDeposit(quote({ recipient: "0x1111111111111111111111111111111111111111", recipientType: "DESTINATION_CHAIN" }), want)).toThrow("pays");
+    expect(() => checkOneClickDeposit(quote({ originAsset: BTC }), want)).toThrow("is for");
+    expect(() => checkOneClickDeposit({}, want)).toThrow("no quote");
+    expect(() => checkOneClickDeposit(quote({ slippageTolerance: 10_000 } as never), want)).toThrow("slippage");
+    expect(() => checkOneClickDeposit(quote({ destinationAsset: "nep141:junk.near" }), want)).toThrow("swaps into");
+    expect(() => checkOneClickDeposit(quote({}), { ...want, amount: "2000001" })).toThrow("less than");
+  });
+  it("finds the one token a swap message sends", () => {
+    const p = JSON.stringify({ intents: [{ intent: "transfer", receiver_id: "depo1", tokens: { [USDC]: "5" } }] });
+    expect(sentTo(p, "depo1")).toEqual({ token: USDC, amount: "5" });
+  });
 });

@@ -13,8 +13,11 @@ import { NETWORK, ROOT, account, exists, loadDeployment, loadKey, near, qFor, sa
 if (NETWORK !== "mainnet") throw new Error("this script is for NETWORK=mainnet; testnet coins come from the factory (seed.ts)");
 const master = process.argv[2];
 if (!master || master.startsWith("--")) throw new Error("usage: mainnet-coin <master.near> --yes-mainnet [--ticker DEGEN]");
+const pi = process.argv.indexOf("--preset");
+const preset = pi > 0 ? process.argv[pi + 1]! : "degen";
 const ti = process.argv.indexOf("--ticker");
-const ticker = ti > 0 ? process.argv[ti + 1]!.toUpperCase() : process.argv.includes("ai") ? "AI" : "DEGEN";
+const DEFAULT_TICKER: Record<string, string> = { degen: "DEGEN", ai: "AI", "ai-index": "AIDX" };
+const ticker = ti > 0 ? process.argv[ti + 1]!.toUpperCase() : (DEFAULT_TICKER[preset] ?? preset.toUpperCase());
 const id = `${ticker.toLowerCase()}.${master}`;
 const d = loadDeployment();
 
@@ -24,8 +27,6 @@ const fundNear = Math.ceil((code.length + 25_000) / 1_000) / 100;
 
 // --preset degen (default): 50% BTC (anchored) + 50% USDC. --preset ai: 50% NVDAon (anchored) + 50% VVV.
 // --preset ai-index: NEAR (anchored) + KAITO + VVV + PUBLIC + ITLX.
-const pi = process.argv.indexOf("--preset");
-const preset = pi > 0 ? process.argv[pi + 1] : "degen";
 const LEGS: Record<string, { symbol: string; weight: number; anchored: boolean }[]> = {
   degen: [{ symbol: "BTC", weight: 5_000, anchored: true }, { symbol: "USDC", weight: 5_000, anchored: false }],
   // Real NVIDIA through Ondo's NVDAon (bridged from BNB Chain; 1Click fills it from about $5.50, so the smallest
@@ -105,8 +106,8 @@ const router = `router.${master}`;
 if (!(await exists(router))) {
   const key = KeyPair.fromRandom("ed25519");
   saveKey(router, key);
-  const res = await account(master).createSubAccount({ accountOrPrefix: "router", publicKey: key.getPublicKey(), nearToTransfer: near(0.3) });
-  console.log(`  created ${router} (0.3 NEAR for relaying gas)\n    ${txLink(res.transaction_outcome.id)}`);
+  const res = await account(master).createSubAccount({ accountOrPrefix: "router", publicKey: key.getPublicKey(), nearToTransfer: near(0.15) });
+  console.log(`  created ${router} (0.15 NEAR for relaying gas: at most ~0.03 per relayed trade)\n    ${txLink(res.transaction_outcome.id)}`);
 }
 const routerEnv = join(homedir(), "backed-ops/router.env");
 mkdirSync(dirname(routerEnv), { recursive: true });
@@ -120,7 +121,11 @@ saveDeployment({
   factory: "none",
   reporter: master,
   protocol: master,
-  coins: [{ account_id: id, ticker, name: ticker.charAt(0) + ticker.slice(1).toLowerCase(), creator: master, created_ms: Date.now() }],
+  // Keep coins from earlier runs: the app lists them, and mainnet-cleanup deletes every one of them.
+  coins: [
+    ...(d.coins ?? []).filter((c) => c.account_id !== id),
+    { account_id: id, ticker, name: ticker.charAt(0) + ticker.slice(1).toLowerCase(), creator: master, created_ms: Date.now() },
+  ],
 });
 console.log(`Wrote deployments/mainnet.json (factory "none", coins: [${id}]). Rebuild the mainnet web build next.`);
 console.log(`The fair launch window is 2 minutes; MetaMask/Phantom buys are refunded until it ends, then the first one opens the curve.`);

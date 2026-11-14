@@ -26,28 +26,18 @@ const NAV = [
 const isActive = (href: string, path: string) => (href === "/app" ? path === "/app" || path.startsWith("/c/") : path.startsWith(href));
 
 /**
- * The brand mark: the coin block itself. Solid yellow below the floor line (what the vault backs),
- * ink stripes above it (hype), in a heavy ink frame. Drawn on a 32 grid so it holds at 20px.
+ * The brand mark: a basket holding three coins. The middle coin is the floor yellow; the two beside it are other
+ * assets, so the mark says what a coin is (a basket of assets). Drawn on a 32 grid so it holds at 20px.
  */
 export function Mark({ size = 26 }: { size?: number }) {
-  const id = useId().replace(/:/g, "");
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden className="shrink-0">
-      <defs>
-        <pattern id={`${id}h`} width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)">
-          <rect width="5" height="5" fill="var(--panel)" />
-          <rect width="2.1" height="5" fill="var(--ink)" />
-        </pattern>
-        <clipPath id={`${id}c`}>
-          <rect x="2" y="2" width="28" height="28" rx="7" />
-        </clipPath>
-      </defs>
-      <g clipPath={`url(#${id}c)`}>
-        <rect x="2" y="2" width="28" height="12" fill={`url(#${id}h)`} />
-        <rect x="2" y="13" width="28" height="17" fill="var(--floor)" />
-        <rect x="2" y="12.25" width="28" height="2.5" fill="var(--ink)" />
-      </g>
-      <rect x="2.75" y="2.75" width="26.5" height="26.5" rx="6.25" fill="none" stroke="var(--ink)" strokeWidth="2.5" />
+      <circle cx="10.5" cy="11" r="5" fill="#2DBE60" stroke="var(--ink)" strokeWidth="1.8" />
+      <circle cx="21.5" cy="11" r="5" fill="#7B61FF" stroke="var(--ink)" strokeWidth="1.8" />
+      <circle cx="16" cy="8.5" r="5.5" fill="var(--floor)" stroke="var(--ink)" strokeWidth="1.8" />
+      <path d="M4.5 15.5h23l-3.2 11.2a2.5 2.5 0 0 1-2.4 1.8H10.1a2.5 2.5 0 0 1-2.4-1.8z" fill="var(--ink)" />
+      <rect x="3" y="13.6" width="26" height="3.4" rx="1.7" fill="var(--ink)" />
+      <path d="M8.2 20.6h15.6M9.4 24.4h13.2" stroke="var(--panel)" strokeWidth="1.3" strokeLinecap="round" />
     </svg>
   );
 }

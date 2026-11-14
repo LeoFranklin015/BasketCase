@@ -1,0 +1,509 @@
+@import "tailwindcss";
+
+/*
+ * A calm money app on a phone, after Dribbble ref 16. Light only: soft grey page, white cards with
+ * big radii and soft shadows, very few elements per view. Colour comes only from each coin's own
+ * avatar and a soft glow in that colour (mint on site pages). Black pills are the primary action,
+ * grey pills the rest. Yellow is a highlighter that means the floor and nothing else.
+ * These values are shared with the X player card.
+ */
+:root,
+[data-theme="dark"],
+[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f6f6f6;
+  --panel: #ffffff;
+  --raised: #ffffff;
+  --sunk: #ececec;
+  --pane: #ffffff;
+  --grid-line: #f0f0f0;
+  --line: #ebebeb;
+  --line-2: #dcdcdc;
+  --ink: #111111;
+  --ink-2: #3a3a3c;
+  --muted: #6e6e73;
+  --faint: #8e8e93;
+  --pill: #ececec;
+  --pill-hover: #e3e3e3;
+  --floor: #ffe14d;
+  --floor-ink: #111111;
+  --floor-deep: #e0b400;
+  --floor-soft: #fff6c2;
+  --floor-text: #111111;
+  --hatch: rgb(17 17 17 / 0.14);
+  --up: #1e9e4a;
+  --up-line: #2dbe60;
+  --up-soft: #e6f6ec;
+  --down: #e5484d;
+  --down-soft: #fdeaea;
+  --focus: #111111;
+  --glow: rgba(110, 220, 150, 0.4);
+  --scrim: rgb(0 0 0 / 0.32);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.05);
+  --shadow-sheet: 0 -8px 40px rgba(0, 0, 0, 0.12);
+  --radius: 24px;
+}
+
+/* The slab used to be a dark surface; in this world it is one more white card. */
+.slab {
+  --bg: #ffffff;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-card: var(--panel);
+  --color-raised: var(--raised);
+  --color-sunk: var(--sunk);
+  --color-pane: var(--pane);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-line-2: var(--line-2);
+  --color-floor: var(--floor);
+  --color-floor-ink: var(--floor-ink);
+  --color-floor-deep: var(--floor-deep);
+  --color-floor-soft: var(--floor-soft);
+  --color-floor-text: var(--floor-text);
+  --color-up: var(--up);
+  --color-up-soft: var(--up-soft);
+  --color-faint: var(--faint);
+  --color-pill: var(--pill);
+  --color-up-line: var(--up-line);
+  --color-down: var(--down);
+  --color-down-soft: var(--down-soft);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: var(--font-inter), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --radius-card: var(--radius);
+}
+
+@layer base {
+  html {
+    background: var(--bg);
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 0.9375rem;
+    line-height: 1.5;
+    font-feature-settings: "cv11" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: #d9f3e1;
+    color: var(--ink);
+  }
+  input,
+  select,
+  textarea {
+    caret-color: var(--ink);
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--line-2) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--line-2);
+    border-radius: 999px;
+    border: 3px solid var(--bg);
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  a {
+    text-underline-offset: 3px;
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+  input[type="range"] {
+    accent-color: var(--ink);
+  }
+}
+
+@layer components {
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+  /* Contract addresses only. */
+  .mono {
+    font-family: var(--font-mono);
+    font-size: 0.92em;
+    letter-spacing: -0.01em;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-card);
+  }
+  .caption {
+    font-size: 0.8125rem;
+    line-height: 1.45;
+    color: var(--muted);
+  }
+  /* Big money numbers and the $TICKER: Inter 700, tight. Pair with .cents for grey trailing digits. */
+  .display {
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: -0.035em;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .cents {
+    color: var(--faint);
+  }
+  /* Headlines. */
+  .meme {
+    font-family: var(--font-display);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    line-height: 1;
+  }
+  .h2 {
+    font-family: var(--font-display);
+    font-size: 1.125rem;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+  }
+  .h-section {
+    font-family: var(--font-display);
+    font-size: clamp(1.5rem, 1.2rem + 1vw, 2rem);
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+  }
+  /* The stat label of "1,273 FOLLOWERS": grey capitals after a black value. */
+  .label {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    line-height: 1.2;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--faint);
+  }
+
+  .slab {
+    background: var(--panel);
+    color: var(--ink);
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow-card);
+  }
+  .band-floor {
+    background: var(--panel);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-card);
+  }
+  /* The floor's highlighter: yellow behind the floor number or label. */
+  .floor-tag {
+    border-radius: 7px;
+    background: var(--floor);
+    color: var(--floor-ink);
+    padding: 0.1em 0.45em;
+    font-weight: 600;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+  }
+
+  /* Buttons: fully rounded pills. Black is the primary action; grey is everything else. */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    padding: 0 1.25rem;
+    border-radius: 999px;
+    border: 0;
+    font-weight: 600;
+    font-size: 0.9375rem;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+      background-color 160ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      color 160ms,
+      transform 120ms;
+  }
+  .btn:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+  .btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .btn-buy,
+  .btn-ink {
+    background: var(--ink);
+    color: #ffffff;
+  }
+  .btn-buy:hover:not(:disabled),
+  .btn-ink:hover:not(:disabled) {
+    background: #2a2a2c;
+  }
+  .btn-sell {
+    background: var(--pill);
+    color: var(--down);
+  }
+  .btn-sell:hover:not(:disabled) {
+    background: var(--pill-hover);
+  }
+  .btn-line,
+  .btn-quiet {
+    background: var(--pill);
+    color: var(--ink);
+  }
+  .btn-line:hover:not(:disabled),
+  .btn-quiet:hover:not(:disabled) {
+    background: var(--pill-hover);
+  }
+  .btn-lg {
+    min-height: 3.5rem;
+    padding: 0 1.75rem;
+    font-size: 1.0625rem;
+  }
+  .btn-sm {
+    min-height: 2.25rem;
+    padding: 0 1rem;
+    font-size: 0.875rem;
+  }
+  .btn-xs {
+    min-height: 1.875rem;
+    padding: 0 0.75rem;
+    font-size: 0.8125rem;
+  }
+  /* A round white icon button with a soft shadow. */
+  .icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: #ffffff;
+    color: var(--ink);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 4px 14px rgba(0, 0, 0, 0.08);
+    transition: transform 120ms;
+  }
+  .icon-btn:hover {
+    transform: translateY(-1px);
+  }
+
+  /* Chips: grey pills; the selected one turns black. */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    min-height: 2.125rem;
+    padding: 0 0.95rem;
+    border-radius: 999px;
+    border: 0;
+    background: var(--pill);
+    color: var(--ink);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    white-space: nowrap;
+    transition:
+      background-color 160ms,
+      color 160ms;
+  }
+  .chip:hover {
+    background: var(--pill-hover);
+  }
+  .chip[aria-pressed="true"],
+  .chip[aria-selected="true"],
+  .chip[aria-checked="true"] {
+    background: var(--ink);
+    color: #ffffff;
+  }
+
+  /* Segmented tabs: a grey track with a white active pill. */
+  .switch {
+    display: inline-flex;
+    padding: 3px;
+    gap: 2px;
+    border-radius: 999px;
+    background: var(--pill);
+  }
+  .switch > button {
+    min-height: 2rem;
+    padding: 0 0.95rem;
+    border-radius: 999px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--muted);
+    transition:
+      background-color 160ms,
+      color 160ms;
+  }
+  .switch > button:hover {
+    color: var(--ink);
+  }
+  .switch > button[aria-pressed="true"],
+  .switch > button[aria-selected="true"] {
+    background: #ffffff;
+    color: var(--ink);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  .field {
+    width: 100%;
+    min-height: 3.25rem;
+    padding: 0 1.125rem;
+    border: 1px solid transparent;
+    border-radius: 18px;
+    background: #f2f2f2;
+    color: var(--ink);
+    font-size: 1rem;
+    font-variant-numeric: tabular-nums;
+    transition:
+      border-color 160ms,
+      background-color 160ms;
+  }
+  .field::placeholder {
+    color: var(--faint);
+  }
+  .field:hover {
+    background: #eeeeee;
+  }
+  .field:focus {
+    outline: none;
+    background: #ffffff;
+    border-color: var(--ink);
+  }
+  select.field {
+    appearance: none;
+    padding-right: 2.25rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 16 16' fill='none' stroke='%236e6e73' stroke-width='1.75' stroke-linecap='round'%3E%3Cpath d='M4.5 6.25 8 9.75l3.5-3.5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.95rem center;
+  }
+
+  /* Above the floor (hype): light grey stripes. */
+  .hatch {
+    background-color: #f2f2f2;
+    background-image: repeating-linear-gradient(-45deg, var(--hatch) 0 2px, transparent 2px 7px);
+  }
+  .link {
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-decoration-color: color-mix(in oklab, currentColor 40%, transparent);
+    text-underline-offset: 3px;
+  }
+  .link:hover {
+    text-decoration-color: currentColor;
+  }
+  .anim-w {
+    transition: clip-path 420ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  /* A soft radial glow at the top of a page, in the coin's colour (mint by default). */
+  .top-glow {
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 520px;
+    pointer-events: none;
+    z-index: -1;
+    background: radial-gradient(60% 70% at 50% 0%, var(--glow-c, var(--glow)), transparent 70%);
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes scrim-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes row-in {
+  from {
+    background: var(--floor-soft);
+  }
+}
+.sheet-in {
+  animation: sheet-in 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.scrim-in {
+  animation: scrim-in 200ms ease-out;
+}
+.row-in {
+  animation: row-in 1600ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Landing entrances: content is always visible; sections only lift in when JS marks them, never hide. */
+[data-reveal="in"] .reveal {
+  animation: lift-in 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--i, 0) * 80ms);
+}
+@keyframes lift-in {
+  from {
+    transform: translateY(14px);
+  }
+}
+@keyframes rise {
+  from {
+    clip-path: inset(100% 0 0 0);
+  }
+}
+.rise {
+  animation: rise 1100ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+@keyframes tick-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+.tick-in {
+  animation: tick-in 500ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+.blink {
+  animation: blink 1.2s steps(2, jump-none) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+  /* Infinite loops stop outright rather than spinning at 0.01ms. */
+  .blink,
+  .animate-pulse {
+    animation: none !important;
+  }
+}
+
+/* How it works: the active step's tab fills while it plays. */
+@keyframes how-progress { from { width: 0 } to { width: 100% } }
+.how-progress { animation: how-progress linear forwards; }
+@media (prefers-reduced-motion: reduce) { .how-progress { animation: none; width: 100%; } }

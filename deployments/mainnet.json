@@ -1,0 +1,116 @@
+{
+  "network": "mainnet",
+  "rpc": "https://rpc.mainnet.fastnear.com",
+  "factory": "PLACEHOLDER-not-deployed-on-mainnet-yet",
+  "verifier": "intents.near",
+  "swapper": "1click",
+  "reporter": "PLACEHOLDER-reporter",
+  "protocol": "PLACEHOLDER-protocol",
+  "tokens": [
+    {
+      "symbol": "USDC",
+      "token_id": "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1",
+      "decimals": 6
+    },
+    {
+      "symbol": "BTC",
+      "token_id": "nep141:nbtc.bridge.near",
+      "decimals": 8
+    },
+    {
+      "symbol": "ETH",
+      "token_id": "nep141:eth.omft.near",
+      "decimals": 18
+    },
+    {
+      "symbol": "SOL",
+      "token_id": "nep141:sol.omft.near",
+      "decimals": 9
+    },
+    {
+      "symbol": "PEPE",
+      "token_id": "nep141:eth-0x6982508145454ce325ddbe47a25d4ec3d2311933.omft.near",
+      "decimals": 18
+    },
+    {
+      "symbol": "DOGE",
+      "token_id": "nep141:doge.omft.near",
+      "decimals": 8
+    },
+    {
+      "symbol": "WIF",
+      "token_id": "nep141:sol-b9c68f94ec8fd160137af8cdfe5e61cd68e2afba.omft.near",
+      "decimals": 6
+    },
+    {
+      "symbol": "wNEAR",
+      "token_id": "nep141:wrap.near",
+      "decimals": 24
+    },
+    {
+      "symbol": "BLACKDRAGON",
+      "token_id": "nep141:blackdragon.tkn.near",
+      "decimals": 24
+    },
+    {
+      "symbol": "SHITZU",
+      "token_id": "nep141:token.0xshitzu.near",
+      "decimals": 18
+    },
+    {
+      "symbol": "JAMBO",
+      "token_id": "nep141:jambo-1679.meme-cooking.near",
+      "decimals": 18
+    },
+    {
+      "symbol": "SHIB",
+      "token_id": "nep141:eth-0x95ad61b0a150d79219dcf64e1e6cc01f0b64c4ce.omft.near",
+      "decimals": 18
+    },
+    {
+      "symbol": "MOG",
+      "token_id": "nep141:eth-0xaaee1a9723aadb7afa2810263653a34ba2c21c7a.omft.near",
+      "decimals": 18
+    },
+    {
+      "symbol": "TURBO",
+      "token_id": "nep141:eth-0xa35923162c49cf95e6bf26623385eb431ad920d3.omft.near",
+      "decimals": 18
+    },
+    {
+      "symbol": "TRUMP",
+      "token_id": "nep141:sol-c58e6539c2f2e097c251f8edf11f9c03e581f8d4.omft.near",
+      "decimals": 6
+    },
+    {
+      "symbol": "BRETT",
+      "token_id": "nep141:base-0x532f27101965dd16442e59d40670faf5ebb142e4.omft.near",
+      "decimals": 18
+    },
+    {
+      "symbol": "KAITO",
+      "token_id": "nep141:base-0x98d0baa52b2d063e780de12f615f963fe8537553.omft.near",
+      "decimals": 18
+    },
+    {
+      "symbol": "VVV",
+      "token_id": "nep141:base-0xacfe6019ed1a7dc6f7b508c02d1b04ec88cc21bf.omft.near",
+      "decimals": 18
+    },
+    {
+      "symbol": "PUBLIC",
+      "token_id": "nep141:token.publicailab.near",
+      "decimals": 18
+    },
+    {
+      "symbol": "ITLX",
+      "token_id": "nep141:itlx.intellex_xyz.near",
+      "decimals": 24
+    },
+    {
+      "symbol": "NVDAon",
+      "token_id": "nep141:bnb-0xa9ee28c80f960b889dfbd1902055218cba016f75.omdep.near",
+      "decimals": 18
+    }
+  ]
+}

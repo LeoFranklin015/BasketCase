@@ -51,6 +51,7 @@ export function XChainBuy({
   minUsd = 0,
   className,
   suggest,
+  fromX,
 }: {
   coin: string;
   ticker: string;
@@ -59,6 +60,8 @@ export function XChainBuy({
   className?: string;
   /** A wallet the page was opened for (from the X card): its button is highlighted and scrolled into view. */
   suggest?: Chain;
+  /** Opened from the X card's Buy: bring the wallet buttons into view and say what to do. */
+  fromX?: boolean;
 }) {
   const below = minUsd > 0 && usd < minUsd;
   const [busy, setBusy] = useState<string | null>(null);
@@ -86,8 +89,8 @@ export function XChainBuy({
   }, []);
   const payRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    if (suggest) requestAnimationFrame(() => payRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }));
-  }, [suggest]);
+    if (suggest || fromX) requestAnimationFrame(() => payRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }));
+  }, [suggest, fromX]);
   // A connected wallet (header or here): show what it holds right away.
   useEffect(() => {
     if (wallet) void refreshHolding(wallet);
@@ -300,6 +303,7 @@ export function XChainBuy({
             highlight={suggest === "solana"}
           />
           {framed && <p className="text-xs text-[#6E6E73]">Opens Basketcase in a new tab, where your wallet can sign.</p>}
+          {fromX && !suggest && !framed && <p className="text-sm font-semibold">Pick your wallet to pay ${usd || 0}: its window opens to approve.</p>}
           {suggest && !framed && (
             <p className="text-sm font-semibold">
               {(suggest === "base" ? wallets.mm : wallets.ph)

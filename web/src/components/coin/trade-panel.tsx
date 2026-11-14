@@ -188,12 +188,14 @@ function BuyForm({ slip, compact, tight }: { slip: number; compact?: boolean; ti
   const [amount, setAmount] = useState("20");
   // Opened from the X card (?pay=base|solana&usd=…): keep its amount and point at that wallet's button.
   const [suggest, setSuggest] = useState<"base" | "solana">();
+  const [fromX, setFromX] = useState(false);
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     const usd = Number(q.get("usd"));
     if (usd > 0 && usd <= 1_000) setAmount(String(usd));
     const pay = q.get("pay");
     if (pay === "base" || pay === "solana") setSuggest(pay);
+    else if (q.get("from") === "x") setFromX(true);
   }, []);
   // The coin's floor bar previews a buy only once the viewer has picked an amount.
   const [touched, setTouched] = useState(false);
@@ -437,7 +439,7 @@ function BuyForm({ slip, compact, tight }: { slip: number; compact?: boolean; ti
       {NET.swapRoute === "oneclick" && (
         <div className="space-y-2 border-t border-line pt-3">
           <p className="text-sm font-semibold">Pay from another chain</p>
-          <XChainBuy coin={snap.id} ticker={snap.config.ticker} usd={payUsd} minUsd={minUsd} suggest={suggest} />
+          <XChainBuy coin={snap.id} ticker={snap.config.ticker} usd={payUsd} minUsd={minUsd} suggest={suggest} fromX={fromX} />
           <p className="caption pt-1 text-center text-xs">or with a NEAR wallet</p>
         </div>
       )}

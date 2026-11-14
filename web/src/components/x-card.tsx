@@ -66,6 +66,16 @@ function Card() {
   const { accountId, connect, disconnect, ensureFunded, method, funding } = useWallet();
   const { xwallet, connectX, disconnectX } = useXWallet();
   const crossChain = NET.swapRoute === "oneclick";
+  // In a post on X the card is a frame on another site, where wallet extensions can't sign. On mainnet, Buy is then
+  // a plain link that opens the coin page in a new tab with the amount filled (links open even when scripts can't).
+  const [framed, setFramed] = useState(false);
+  useEffect(() => {
+    try {
+      setFramed(window.self !== window.top);
+    } catch {
+      setFramed(true);
+    }
+  }, []);
   const [has, setHas] = useState({ mm: false, ph: false });
   useEffect(() => setHas({ mm: hasMetaMask(), ph: hasPhantom() }), []);
   // MetaMask or Phantom from the Connect sheet: the same wallet the site's header connects.
@@ -380,9 +390,24 @@ function Card() {
             />
             <span className="xc-get">{pay > 0 && pay < minUsd ? `min $${fmtMin(minUsd)}` : tokensFor > 0 ? `≈ ${fmt(tokensFor)}` : pay > MAX_USD ? `max $${MAX_USD}` : ""}</span>
           </label>
-          <button type="submit" className="xc-btn" disabled={busy || !amountOk} data-testid="x-buy" aria-live="polite">
-            {busy ? <span className="xc-busy">{status ?? "Working…"}</span> : <><BuyIcon />Buy</>}
-          </button>
+          {framed && crossChain && !accountId ? (
+            <a
+              className="xc-btn"
+              href={`/c/${encodeURIComponent(snap.id)}?from=x&usd=${amountOk ? pay : 20}`}
+              target="_blank"
+              rel="noopener"
+              data-testid="x-buy"
+              aria-disabled={!amountOk}
+              style={{ textDecoration: "none" }}
+            >
+              <BuyIcon />
+              Buy
+            </a>
+          ) : (
+            <button type="submit" className="xc-btn" disabled={busy || !amountOk} data-testid="x-buy" aria-live="polite">
+              {busy ? <span className="xc-busy">{status ?? "Working…"}</span> : <><BuyIcon />Buy</>}
+            </button>
+          )}
         </form>
       )}
 

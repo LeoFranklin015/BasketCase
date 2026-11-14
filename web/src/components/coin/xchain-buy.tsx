@@ -48,14 +48,23 @@ export function XChainBuy({ coin, ticker, usd, minUsd = 0, className }: { coin: 
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string>();
   const [order, setOrder] = useState<Order | null>(null);
+  const orderId = order?.id;
   const [wallet, setWallet] = useState<{ chain: Chain; user: string } | null>(null);
   const [holding, setHolding] = useState<string | null>(null);
   const [assets, setAssets] = useState<Record<string, string>>({});
   const [sentTx, setSentTx] = useState<{ chain: Chain; hash: string } | null>(null);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const statusRef = useRef<HTMLDivElement | null>(null);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
   const signing = useRef<string | null>(null);
   const [wallets, setWallets] = useState({ mm: false, ph: false });
   useEffect(() => setWallets({ mm: hasMetaMask(), ph: hasPhantom() }), []);
+  // A new order: start its clock and bring its progress into view (the pay buttons sit low on the page).
+  useEffect(() => {
+    if (!orderId) return setStartedAt(null);
+    setStartedAt(Date.now());
+    requestAnimationFrame(() => statusRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }));
+  }, [orderId]);
   useEffect(() => () => void (timer.current && clearInterval(timer.current)), []);
 
   const connect = async (chain: Chain) => {
@@ -215,9 +224,14 @@ export function XChainBuy({ coin, ticker, usd, minUsd = 0, className }: { coin: 
   const hasHolding = holding !== null && BigInt(holding || "0") > 0n;
   const hasAssets = Object.keys(assets).length > 0;
   const stage = order?.kind === "buy" ? (STAGE[order.status] ?? 1) : 0;
+  const working = !!order && !["done", "refunded", "error"].includes(order.status);
 
   return (
     <div className={className}>
+      <style>{`@keyframes xb-spin{to{transform:rotate(360deg)}}.xb-spin{animation:xb-spin .9s linear infinite}
+@keyframes xb-bar{0%{transform:translateX(-100%)}100%{transform:translateX(250%)}}
+.xb-bar{background:linear-gradient(90deg,transparent,#111 40%,#FFE14D 60%,transparent);width:40%;animation:xb-bar 1.4s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.xb-spin,.xb-bar{animation:none}}`}</style>
       {!order ? (
         <div className="grid gap-2.5">
           <PayButton onClick={() => void pay("base")} disabled={!!busy || !(usd > 0) || below} wallet="metamask" chain="base" label={busy === "base" ? "Confirm in MetaMask…" : `MetaMask · $${usd || 0} USDC on Base`} missing={!wallets.mm} />
@@ -254,20 +268,43 @@ export function XChainBuy({ coin, ticker, usd, minUsd = 0, className }: { coin: 
           )}
         </div>
       ) : (
-        <div className="rounded-[18px] bg-[#F6F6F6] p-4" role="status" aria-live="polite">
-          {order.kind === "buy" ? (
-            <ol className="grid gap-2">
-              {BUY_STEPS.map((s, i) => (
-                <li key={s} className="flex items-center gap-2.5 text-sm">
-                  <span className={`grid size-5 place-items-center rounded-full text-[11px] font-bold ${i < stage ? "bg-[#111] text-white" : i === stage ? "bg-[#FFE14D] text-[#111]" : "bg-[#E3E3E3] text-[#8E8E93]"}`}>
-                    {i < stage ? "✓" : i + 1}
-                  </span>
-                  <span className={i <= stage ? "text-[#111]" : "text-[#8E8E93]"}>{s}</span>
-                </li>
-              ))}
+        <div ref={statusRef} className="relative scroll-mt-24 overflow-hidden rounded-[18px] bg-[#F6F6F6] p-4" role="status" aria-live="polite">
+          {working && <div aria-hidden className="xb-bar absolute inset-x-0 top-0 h-[3px]" />}
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <p className="text-sm font-semibold">
+              {order.kind === "buy" ? `Buying $${ticker}` : order.kind === "sell" ? `Selling $${ticker}` : `Cashing out to USDC on ${wallet ? chainName(wallet.chain) : "your chain"}`}
+            </p>
+            {working && startedAt && <Elapsed since={startedAt} />}
+          </div>
+          {order.kind === "buy" && (
+            <ol className="grid gap-2.5">
+              {BUY_STEPS.map((s, i) => {
+                const done = i < stage || order.status === "done";
+                const current = !done && i === stage && working;
+                return (
+                  <li key={s} className="flex items-center gap-2.5 text-sm">
+                    <span className="relative grid size-6 shrink-0 place-items-center">
+                      {current && <span aria-hidden className="xb-spin absolute inset-0 rounded-full border-2 border-[#FFE14D] border-t-[#111]" />}
+                      <span
+                        className={`grid size-5 place-items-center rounded-full text-[11px] font-bold ${done ? "bg-[#111] text-white" : current ? "bg-white text-[#111]" : "bg-[#E3E3E3] text-[#8E8E93]"}`}
+                      >
+                        {done ? "✓" : i + 1}
+                      </span>
+                    </span>
+                    <span className={done || current ? "text-[#111]" : "text-[#8E8E93]"}>
+                      {s}
+                      {current && <span className="ml-1.5 text-[#6E6E73]">· {stageHint(order.status, busy === "sign")}</span>}
+                    </span>
+                  </li>
+                );
+              })}
             </ol>
-          ) : (
-            <p className="text-sm font-semibold">{order.kind === "sell" ? `Selling $${ticker}` : `Cashing out to USDC on ${wallet ? chainName(wallet.chain) : "your chain"}`}</p>
+          )}
+          {working && (
+            <p className="mt-3 text-xs text-[#6E6E73]">
+              {friendlyStep(order.step, busy === "sign")}
+              {" · "}usually about {order.kind === "buy" ? "1–2 minutes" : "a minute"}. You can leave this open; nothing moves without your signature.
+            </p>
           )}
           {order.status === "sign" && order.toSign && (
             <ul className="mt-3 grid gap-1 text-xs text-[#6E6E73]">
@@ -276,7 +313,7 @@ export function XChainBuy({ coin, ticker, usd, minUsd = 0, className }: { coin: 
               ))}
             </ul>
           )}
-          {order.status !== "done" && order.step && <p className="mt-3 text-sm text-[#6E6E73]">{busy === "sign" ? "Check your wallet to sign" : order.step}…</p>}
+
           {order.status === "done" && order.kind === "buy" && (
             <p className="mt-3 text-[15px]">
               <b>You&apos;re in:</b> {fmtTokens(order.tokens)} ${ticker} in NEAR Intents, under your wallet&apos;s own address.
@@ -375,4 +412,33 @@ function PayButton({ onClick, disabled, wallet, chain, label, missing }: { onCli
       {label}
     </button>
   );
+}
+
+/** What the current step is waiting on, in a few words. */
+function stageHint(status: string, signing: boolean): string {
+  if (signing || status === "sign") return "check your wallet";
+  if (status === "awaiting_deposit") return "waiting for your USDC";
+  if (status === "funded") return "preparing the swaps";
+  if (status === "swapping") return "1Click is filling";
+  if (status === "executing") return "minting";
+  return "working";
+}
+
+/** The server's step text, without retry internals (those stay in the order record). */
+function friendlyStep(step: string | undefined, signing: boolean): string {
+  if (signing) return "Approve the messages in your wallet";
+  if (!step) return "Working";
+  if (/retrying/i.test(step)) return "Taking a little longer than usual, still working";
+  return step.replace(/\s*\(retrying.*$/i, "");
+}
+
+/** m:ss since the order started. */
+function Elapsed({ since }: { since: number }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const sec = Math.max(0, Math.floor((now - since) / 1000));
+  return <span className="num text-xs font-semibold tabular-nums text-[#6E6E73]">{`${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`}</span>;
 }

@@ -106,8 +106,8 @@ const router = `router.${master}`;
 if (!(await exists(router))) {
   const key = KeyPair.fromRandom("ed25519");
   saveKey(router, key);
-  const res = await account(master).createSubAccount({ accountOrPrefix: "router", publicKey: key.getPublicKey(), nearToTransfer: near(0.15) });
-  console.log(`  created ${router} (0.15 NEAR for relaying gas: at most ~0.03 per relayed trade)\n    ${txLink(res.transaction_outcome.id)}`);
+  const res = await account(master).createSubAccount({ accountOrPrefix: "router", publicKey: key.getPublicKey(), nearToTransfer: near(0.35) });
+  console.log(`  created ${router} (0.35 NEAR: NEAR checks a sender can cover 300 TGas at a pessimistic price, ~0.3 NEAR, before a relay; real use is ~0.002 per trade)\n    ${txLink(res.transaction_outcome.id)}`);
 }
 const routerEnv = join(homedir(), "backed-ops/router.env");
 mkdirSync(dirname(routerEnv), { recursive: true });
